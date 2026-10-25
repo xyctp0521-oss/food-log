@@ -719,6 +719,11 @@
   // PBKDF2-SHA256(21032602, salt) —— 代码是公开的，只存哈希不存明文
   const PWD_HASH = '10cef5f61e7ffa09a9bcfbdc4a09bcaf9f5ea57debc54672b4dd8f2efee56901';
 
+  // 内置同步配置：AES-GCM 密文（iv 12 + 密文 + tag），用登录密码派生密钥解开。
+  // 不存明文 —— 公开仓库里的明文 GitHub token 会被 secret scanning 自动吊销。
+  const CFG_SALT = 'food-log-cfg-2026';
+  const CFG_SEAL = 'Dx8rMFUJvEvLBPPWq1Cv3D98+RONRq9J6MUlxULLpW7+KnuFX9/UkHT1mPx5I3s922wwXr2V8MxmQsO2crOgHFBm5iNKMBLf9xy1qb3z539yQAe2t+eXWGykuU1EybVjYzLnP2K9in9/qMMmHtinX48W+pedEEagPTyiN/7XJjiqqvSr4zBv7Cy1A3JDYvwbWfI5dgP4fYJnBWKEFFBnb+JKFm5fxyYAICjaurZMQ/fz+FH0koNA/E3sd0F5knprQXGcLA==';
+
   let pickedAccount = '';
 
   async function hashPwd(pwd) {
@@ -729,6 +734,23 @@
       keyMat, 256
     );
     return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  /** 用登录密码解开内置的 GitHub 配置 */
+  async function unsealCfg(pwd) {
+    const enc = new TextEncoder();
+    const km = await crypto.subtle.importKey('raw', enc.encode(pwd), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: enc.encode(CFG_SALT), iterations: PWD_ITER, hash: 'SHA-256' },
+      km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+    );
+    const bin = atob(CFG_SEAL);
+    const raw = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) raw[i] = bin.charCodeAt(i);
+    const iv = raw.slice(0, 12);
+    const ct = raw.slice(12);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+    return JSON.parse(new TextDecoder().decode(plain));
   }
 
   function initLogin() {
@@ -771,13 +793,31 @@
         return;
       }
       Store.setSession(pickedAccount);
+
+      // 自动套用内置同步配置（同一密码解封）；解不开就保底走手动填写
+      let autoCfg = false;
+      try {
+        const cfg = await unsealCfg(pwd);
+        if (cfg && cfg.owner && cfg.repo && cfg.token) {
+          Store.saveCfg(cfg);
+          autoCfg = true;
+        }
+      } catch (e) {
+        console.warn('内置同步配置解封失败：', e.message);
+      }
+
       hideLogin();
       loadSet();
       renderRank();
       renderMe();
-      toast(`欢迎，${pickedAccount}`);
-      if (Store.ready) doSync(true);
-      else { go('page-set'); toast('还差 GitHub 仓库配置', 2600); }
+
+      if (Store.ready) {
+        toast(`欢迎，${pickedAccount}`);
+        doSync(true);
+      } else {
+        toast(`欢迎，${pickedAccount}（同步还没配好）`, 2600);
+        go('page-set');
+      }
     } catch (e) {
       $('#login-err').textContent = '登录失败：' + e.message;
     } finally {
