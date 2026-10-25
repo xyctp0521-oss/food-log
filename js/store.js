@@ -1,4 +1,4 @@
-/* 数据层：本地缓存 + Gitee 云同步 + 离线补交
+/* 数据层：本地缓存 + GitHub 云同步 + 离线补交
  * 关键设计：每人一个独立数据文件 data/users/u_<hash>.json
  *   → 多人同时提交不会互相覆盖，只有「同一人两台设备同时提交」才可能冲突（已带 sha 重试）
  */
@@ -58,15 +58,15 @@
       this.pending = readLS(K.pending, []);
       this.lastSync = readLS(K.syncedAt, 0);
       const cfg = this.cfg();
-      this.client = new GiteeClient(cfg);
+      this.client = new GitHubClient(cfg);
       return this;
     },
 
-    cfg() { return readLS(K.cfg, { nick: '', owner: '', repo: '', token: '', branch: 'master' }); },
+    cfg() { return readLS(K.cfg, { nick: '', owner: '', repo: '', token: '', branch: 'main' }); },
     saveCfg(cfg) {
       const merged = Object.assign(this.cfg(), cfg);
       writeLS(K.cfg, merged);
-      this.client = new GiteeClient(merged);
+      this.client = new GitHubClient(merged);
       return merged;
     },
     get ready() { return this.client && this.client.ready && !!this.cfg().nick; },
@@ -93,7 +93,7 @@
       }
 
       const files = dir.filter(f => f.type === 'file' && /^u_.*\.json$/.test(f.name));
-      // 人数不会多，直接并发读；Gitee 限速 60/h，故加轻量间隔
+      // 人数不会多，逐个串行读，避免一次性打完接口
       for (const f of files) {
         try {
           const r = await this.client.getFile(`${USERS_DIR}/${f.name}`);

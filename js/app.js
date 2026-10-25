@@ -407,15 +407,20 @@
 
   $('#btn-test').addEventListener('click', async () => {
     const owner = $('#set-owner').value.trim(), repo = $('#set-repo').value.trim(), token = $('#set-token').value.trim();
-    const branch = $('#set-branch').value.trim() || 'master';
+    const branch = $('#set-branch').value.trim() || 'main';
     if (!owner || !repo || !token) return toast('三个字段都要填');
     const hint = $('#set-hint');
     hint.textContent = '测试中…';
-    const c = new GiteeClient({ owner, repo, token, branch });
+    const c = new GitHubClient({ owner, repo, token, branch });
     try {
-      await c.listDir('data');       // 404 也说明仓库与令牌有效
-      hint.textContent = '✅ 连上了，仓库和令牌都没问题';
-      hint.style.color = 'var(--good)';
+      const info = await c.checkRepo();     // 真正校验仓库存在 + 令牌可读
+      if (info.defaultBranch && info.defaultBranch !== branch) {
+        hint.textContent = `⚠️ 能连上，但仓库默认分支是 ${info.defaultBranch}，你填的是 ${branch}`;
+        hint.style.color = '#E8A33D';
+      } else {
+        hint.textContent = '✅ 连上了，仓库和令牌都没问题';
+        hint.style.color = 'var(--good)';
+      }
     } catch (e) {
       hint.textContent = '❌ ' + (e.status === 401 || e.status === 403 ? '令牌无效或没有仓库权限' : e.message);
       hint.style.color = 'var(--bad)';
@@ -450,7 +455,7 @@
 
   /* ================= 同步 ================= */
   async function doSync(silent) {
-    if (!Store.ready) { if (!silent) toast('先配置昵称和 Gitee'); return; }
+    if (!Store.ready) { if (!silent) toast('先配置昵称和 GitHub 仓库'); return; }
     const btn = $('#btn-sync');
     btn.classList.add('spin');
     try {
@@ -475,7 +480,7 @@
     renderRank();
     if (!Store.myNick()) {
       go('page-set');
-      toast('先填昵称和 Gitee 配置，就能开用了');
+      toast('先填昵称和 GitHub 仓库配置，就能开用了');
     } else {
       doSync(true);
     }

@@ -1,12 +1,12 @@
 /* Service Worker：只缓存本站静态资源，保证没信号时也能打开记账
- * Gitee API 属跨域请求，不拦截，始终走网络
+ * GitHub API 属跨域请求，不拦截，始终走网络
  */
-const CACHE = 'foodlog-v1';
+const CACHE = 'foodlog-v2';
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
-  './js/gitee.js',
+  './js/remote.js',
   './js/store.js',
   './js/app.js',
   './manifest.webmanifest',
@@ -36,7 +36,7 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;   // Gitee API 放行
+  if (url.origin !== self.location.origin) return;   // GitHub API 放行
 
   // 页面导航：网络优先，离线回退首页
   if (req.mode === 'navigate') {

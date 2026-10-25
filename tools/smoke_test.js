@@ -18,7 +18,7 @@ function check(name, cond) {
   if (!cond) fail++;
 }
 
-require('../js/gitee.js');
+require('../js/remote.js');
 require('../js/store.js');
 const Store = global.Store;
 const { DIMS, summarize, nickHash } = global.FoodUtil;
@@ -28,7 +28,7 @@ check('中文昵称稳定', nickHash('小羊') === nickHash('小羊'));
 check('不同昵称不同', nickHash('小羊') !== nickHash('小陈'));
 check('8位hex', /^[0-9a-f]{8}$/.test(nickHash('小羊')));
 
-console.log('[2] 未配置 Gitee 时 = 离线模式');
+console.log('[2] 未配置 GitHub 时 = 离线模式');
 Store.init();
 Store.saveCfg({ nick: '小羊', owner: '', repo: '', token: '' });
 check('ready=false', Store.ready === false);

@@ -122,11 +122,11 @@
     </div>
 
     <div class="card">
-      <label class="lbl">Gitee 同步</label>
-      <input type="text" id="set-owner" placeholder="Gitee 用户名（owner）">
-      <input type="text" id="set-repo" placeholder="仓库名（repo）">
-      <input type="password" id="set-token" placeholder="私人令牌 access_token">
-      <input type="text" id="set-branch" placeholder="分支（默认 master）" value="master">
+      <label class="lbl">GitHub 同步</label>
+      <input type="text" id="set-owner" placeholder="GitHub 用户名（owner）">
+      <input type="text" id="set-repo" placeholder="仓库名，如 food-log-data">
+      <input type="password" id="set-token" placeholder="Personal access token">
+      <input type="text" id="set-branch" placeholder="分支（默认 main）" value="main">
       <div class="row2">
         <button class="btn-ghost" id="btn-test">测试连接</button>
         <button class="btn-main" id="btn-save-set">保存</button>
@@ -147,7 +147,7 @@
     <div class="card">
       <label class="lbl">说明</label>
       <div class="about">
-        <p>· 数据存在你自己的 Gitee 仓库里，不经过任何第三方服务器。</p>
+        <p>· 数据存在你自己的 GitHub 仓库里，不经过任何第三方服务器。</p>
         <p>· 没信号时照常记录，联网后会自动补交。</p>
         <p>· 令牌只保存在这台设备上，换设备要重新填。</p>
       </div>
@@ -170,7 +170,7 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script src="js/gitee.js"></script>
+<script src="js/remote.js"></script>
 <script src="js/store.js"></script>
 <script src="js/app.js"></script>
 </body>

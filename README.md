@@ -1,6 +1,8 @@
 # 探店簿 🍜
 
-记录和小伙伴们的美食探店，多维度评分 + 云同步。纯静态网页（PWA），**零服务器、零费用**，数据存在自己的 Gitee 仓库里。
+记录和小伙伴们的美食探店，多维度评分 + 云同步。纯静态网页（PWA），**零服务器、零费用**，数据存在自己的 GitHub 私人仓库里。
+
+**线上地址**：https://xyctp0521-oss.github.io/food-log/
 
 ## 功能
 
@@ -11,23 +13,50 @@
 - 📱 **像 App**：添加到主屏幕后全屏运行，有独立图标
 - 💾 **备份**：一键导出/导入 JSON
 
-## 第一次使用（创建者，约 5 分钟）
+## 两个仓库的分工
 
-### 1. 建 Gitee 仓库
+| 仓库 | 可见性 | 存什么 |
+|---|---|---|
+| `food-log` | **Public**（必须，Pages 限制） | 代码。不含任何令牌 |
+| `food-log-data` | **Private**（推荐） | 探店数据 `data/*.json` |
 
-新建一个**私有**仓库（如 `food-log`），勾选「初始化 README」，分支保持 `master`。
+代码公开、数据私有 —— 别人能看到程序，看不到你们吃了什么。
 
-### 2. 生成私人令牌
+## 第一次使用（建数据仓库 + 令牌，约 3 分钟）
 
-Gitee → 设置 → 安全设置 → **私人令牌** → 生成新令牌 → 勾选 `projects` 权限 → 复制保存（只显示一次）。
+### 1. 建数据仓库
 
-> 令牌等于仓库写权限，只发给一起用的人，别外传。
+新建一个**私有**空仓库，名字 `food-log-data`，不要勾任何初始化选项：
 
-### 3. 打开网页，填配置
+https://github.com/new?name=food-log-data&visibility=private
 
-设置页填：昵称、Gitee 用户名、仓库名、令牌 → 点「测试连接」看到 ✅ → 保存。
+### 2. 生成 Fine-grained Token（精确授权，比 classic 安全）
 
-首次提交数据后，仓库里会自动生成：
+打开 https://github.com/settings/personal-access-tokens/new
+
+| 字段 | 填什么 |
+|---|---|
+| Token name | `food-log` |
+| Expiration | 90 days（到期重新生成） |
+| Repository access | **Only select repositories** → 只选 `food-log-data` |
+| Permissions → Contents | **Read and write** |
+| Permissions → Metadata | Read-only（自动勾上，必需） |
+
+生成后复制 `github_pat_...` 开头的令牌（只显示一次）。
+
+> 为什么不建议用 classic token：classic 勾 `repo` 等于你**所有**仓库的读写权，泄露了很麻烦。Fine-grained 只能碰这一个仓库。
+
+### 3. 在网页里配置
+
+打开站点 → 设置页：
+
+- 昵称：你自己叫啥
+- GitHub 用户名：`xyctp0521-oss`
+- 仓库名：`food-log-data`
+- Personal access token：上面复制的
+- 分支：`main`
+
+点「测试连接」，看到 ✅ 再保存。首次提交后仓库会自动生成：
 
 ```
 data/
@@ -38,29 +67,21 @@ data/
 
 ## 朋友怎么用
 
-把部署好的网址发给朋友，朋友打开 → 设置页填**自己的昵称** + **同一个仓库和令牌** → 开记。不需要注册任何账号。
+把网址发给朋友，他们各自填**自己的昵称** + **同一个数据仓库和令牌**，就能一起评分。不需要注册任何账号。
 
-## 部署（任选其一）
+## 手机安装成 App
 
-| 方式 | 操作 | 适合 |
-|---|---|---|
-| 自己服务器 | 把整个目录丢给 nginx/caddy 做静态站 | 已有服务器，国内访问快 |
-| GitHub Pages | 仓库 Settings → Pages → 选分支 | 你已有经验，但国内偶尔抽风 |
-| Cloudflare Pages | 连仓库自动部署 | 免费，国内可用性较好 |
+- **iPhone**：Safari 打开 → 分享 → 添加到主屏幕
+- **安卓**：Chrome 打开 → 右上菜单 → 添加到主屏幕
 
-本地试跑：`python -m http.server 8642` → 浏览器开 `http://127.0.0.1:8642`。
-
-> PWA（添加到主屏、离线缓存）要求 **HTTPS 或 localhost**，部署到服务器记得配证书。
-
-## 手机上「装」成 App
-
-手机浏览器打开网址 →（iOS Safari：分享 → 添加到主屏幕 / Android Chrome：菜单 → 添加到主屏幕）→ 桌面出现独立图标，点开全屏运行。
+装完桌面有橙底白碗图标，点开全屏无地址栏。
 
 ## 注意事项
 
-- Gitee API 匿名限速 60 次/小时，本应用已做本地缓存，正常使用不会触顶；若多人频繁刷新可等一小时或稍后再同步
-- 令牌存在各人自己设备的 localStorage 里，只用于读写这个仓库；建议就用一个**专用空仓库**，别放别的数据
-- 「修改评分」走同一份用户文件，Gitee 端带 sha 冲突重试，正常使用不会丢数据
+- **GitHub API 在国内会抖动**（实测直连 0.2s ~ 1.3s 波动）。应用已做离线优先 + 自动重试：同步失败不丢数据，只是延迟，下次打开自动补交
+- 认证后限流 **5000 次/小时**，正常使用远够不上
+- 令牌存在各人自己浏览器的 localStorage 里；换设备要重新填
+- 「修改评分」写同一份用户文件，GitHub 端带 sha 冲突重试，正常用不会丢数据
 
 ## 项目结构
 
@@ -68,11 +89,20 @@ data/
 food-log/
 ├── index.html            # 页面结构（4 个 tab + 店铺详情弹层）
 ├── manifest.webmanifest  # PWA 配置
-├── sw.js                 # 离线缓存（静态资源；Gitee API 不拦截）
+├── sw.js                 # 离线缓存（静态资源；GitHub API 不拦截）
 ├── css/style.css         # 暖橙主题
-├── js/gitee.js           # Gitee Contents API 封装（UTF-8 base64、sha 冲突重试）
+├── js/remote.js          # GitHub Contents API 封装（UTF-8 base64、sha 冲突重试）
 ├── js/store.js           # 数据层（本地缓存、按用户分片、离线队列、合并逻辑）
 ├── js/app.js             # UI 交互
 ├── tools/gen_icons.py    # 图标生成（纯标准库）
 └── tools/smoke_test.js   # 数据层冒烟测试（node tools/smoke_test.js）
 ```
+
+## 本地开发
+
+```bash
+python -m http.server 8642      # 然后开 http://127.0.0.1:8642
+node tools/smoke_test.js        # 数据层测试
+```
+
+> PWA（添加到主屏、离线缓存）要求 HTTPS 或 localhost。
