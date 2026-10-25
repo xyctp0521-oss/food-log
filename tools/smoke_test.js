@@ -44,7 +44,8 @@ check('无仓库配置 ready=false', Store.ready === false);
 
   await Store.saveMyRatings([{
     id: 'r1', placeId: Store.places[0].id, placeName: '笨萝卜浏阳菜馆',
-    taste: 5, env: 4, service: 4, value: 5, comment: '擂辣椒绝了', tags: ['值得二刷'],
+    taste: 10, env: 8, service: 6, price: 0, hygiene: 0, speed: 0,
+    comment: '擂辣椒绝了', tags: ['值得二刷'],
     visitedAt: '2026-10-25', updatedAt: '2026-10-25T12:00:00Z'
   }]);
   check('离线入队 ratings', Store.pending.some(o => o.type === 'ratings'));
@@ -54,7 +55,7 @@ check('无仓库配置 ready=false', Store.ready === false);
   const rs = Store.ratingsOf(Store.places[0].id);
   check('查到 1 条评分', rs.length === 1);
   const s = summarize(rs);
-  check('综合分 = 4.5', Math.abs(s.total - 4.5) < 1e-9);
+  check('综合分 = 8.0（只平均已评的 3 个维度）', Math.abs(s.total - 8) < 1e-9);
 
   console.log('[5] 合并逻辑：按 updatedAt 取新');
   const a = { id: 'p1', name: '旧名', updatedAt: '2026-01-01' };

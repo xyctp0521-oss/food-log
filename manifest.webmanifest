@@ -1,7 +1,7 @@
 {
-  "name": "探店簿 · 小伙伴的美食账本",
-  "short_name": "探店簿",
-  "description": "记录和小伙伴们的美食探店与多维度评分",
+  "name": "探店日记 · 美食探店记录",
+  "short_name": "探店日记",
+  "description": "记录和小伙伴们的美食探店与多维度评分（10 分制）",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

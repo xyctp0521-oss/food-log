@@ -116,14 +116,25 @@ textarea{resize:none;line-height:1.6}
 .mini-tag.bad{background:#FDECEA;color:var(--bad)}
 
 /* ---------- 打分 ---------- */
-.dim-block{background:var(--brand-soft);border-radius:12px;padding:12px 14px;margin:12px 0}
-.dim-row{display:flex;align-items:center;gap:10px;padding:5px 0}
-.dim-name{width:52px;font-size:14px;font-weight:700;flex:0 0 auto}
-.dim-val{width:26px;text-align:right;font-size:13px;color:var(--ink-2);font-weight:700;flex:0 0 auto}
-.stars{display:flex;gap:4px;flex:1}
-.star{font-size:23px;color:#E6DCD4;cursor:pointer;line-height:1;transition:transform .1s}
-.star.on{color:var(--star)}
-.star:active{transform:scale(1.25)}
+.dim-block{background:var(--brand-soft);border-radius:12px;padding:12px 12px 10px;margin:12px 0}
+.dim-row{padding:6px 0}
+.dim-head{display:flex;align-items:baseline;gap:7px;margin-bottom:5px}
+.dim-name{font-size:13px;font-weight:700}
+.dim-val{font-size:12px;font-weight:800;color:var(--brand-deep);min-width:15px}
+.num-scale{display:flex;gap:3px}
+.num{
+  flex:1;min-width:0;height:30px;border-radius:7px;border:1px solid #EBDFD5;
+  background:#fff;color:#B2A79D;font-size:12px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;padding:0;
+  transition:background .1s,color .1s,transform .08s;
+}
+.num:active{transform:scale(.9)}
+.num.on{background:#FFE3D5;border-color:#F5C4AC;color:var(--brand-deep)}
+.num.cur{color:#fff;box-shadow:0 2px 6px rgba(232,85,32,.22)}
+.num.cur.lv1{background:#E5544B;border-color:#E5544B}
+.num.cur.lv2{background:#E8A33D;border-color:#E8A33D}
+.num.cur.lv3{background:#8FBF4D;border-color:#8FBF4D}
+.num.cur.lv4{background:#2FA36B;border-color:#2FA36B}
 .picked{
   background:var(--brand);color:#fff;border-radius:12px;padding:11px 14px;
   font-weight:700;font-size:16px;

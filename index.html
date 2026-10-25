@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#FF6B35">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="探店簿">
-<title>探店簿 · 小伙伴的美食账本</title>
+<meta name="apple-mobile-web-app-title" content="探店日记">
+<title>探店日记 · 小伙伴的美食账本</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="css/style.css">
@@ -18,7 +18,7 @@
 <div class="login" id="login">
   <div class="login-box">
     <div class="login-logo">🍜</div>
-    <h1 class="login-title">探店簿</h1>
+    <h1 class="login-title">探店日记</h1>
     <p class="login-sub" id="login-sub">选一个身份进入</p>
 
     <div class="accounts" id="accounts"></div>
@@ -38,7 +38,7 @@
   <section class="page" id="page-rank">
     <header class="topbar">
       <div>
-        <h1 class="brand">探店簿</h1>
+        <h1 class="brand">探店日记</h1>
         <p class="sub" id="rank-sub">加载中…</p>
       </div>
       <button class="icon-btn" id="btn-sync" title="同步">⟳</button>
@@ -97,12 +97,8 @@
     <div class="card" id="step-rate" hidden>
       <div class="picked" id="picked-name"></div>
 
-      <div class="dim-block">
-        <div class="dim-row" data-dim="taste"><span class="dim-name">味道</span><div class="stars" data-dim="taste"></div><span class="dim-val">-</span></div>
-        <div class="dim-row" data-dim="env"><span class="dim-name">环境</span><div class="stars" data-dim="env"></div><span class="dim-val">-</span></div>
-        <div class="dim-row" data-dim="service"><span class="dim-name">服务</span><div class="stars" data-dim="service"></div><span class="dim-val">-</span></div>
-        <div class="dim-row" data-dim="value"><span class="dim-name">性价比</span><div class="stars" data-dim="value"></div><span class="dim-val">-</span></div>
-      </div>
+      <div class="dim-block" id="dim-block"></div>
+      <p class="hint" style="margin-top:8px">满分 10 分，同向打分：价格填「实惠程度」、等位填「出餐速度」，越高分越好。可不全填。</p>
 
       <label class="lbl">标签</label>
       <div class="chips pick-chips" id="tag-chips"></div>

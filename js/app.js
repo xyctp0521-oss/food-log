@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const { DIMS, summarize, avatarColor } = window.FoodUtil;
+  const { DIMS, MAX_SCORE, summarize, ratingTotal, avatarColor } = window.FoodUtil;
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 
@@ -18,7 +18,7 @@
       .split("'").join(AMP + '#39;');
   }
   const n1 = v => (Math.round(Number(v || 0) * 10) / 10).toFixed(1);
-  const bar = (v) => `<div class="bar-track"><div class="bar-fill" style="width:${Math.max(0, Math.min(100, (v / 5) * 100))}%"></div></div>`;
+  const bar = (v) => `<div class="bar-track"><div class="bar-fill" style="width:${Math.max(0, Math.min(100, (v / MAX_SCORE) * 100))}%"></div></div>`;
 
   const TAGS = ['值得二刷', '踩雷', '排队久', '性价比高', '环境好', '服务好', '适合聚餐', '一人食', '分量足', '要预约'];
   const NEG_TAGS = ['踩雷', '排队久'];
@@ -138,14 +138,14 @@
       </div>
 
       ${s.count ? `<div class="card">
-        <div class="taste-line"><div class="l">综合</div><div class="t"><div class="f" style="width:${(s.total / 5) * 100}%"></div></div><div class="v">${n1(s.total)}</div></div>
-        ${DIMS.map(d => `<div class="taste-line"><div class="l">${d.label}</div><div class="t"><div class="f" style="width:${(s[d.key] / 5) * 100}%"></div></div><div class="v">${n1(s[d.key])}</div></div>`).join('')}
+        <div class="taste-line"><div class="l">综合</div><div class="t"><div class="f" style="width:${(s.total / MAX_SCORE) * 100}%"></div></div><div class="v">${n1(s.total)}</div></div>
+        ${DIMS.map(d => `<div class="taste-line"><div class="l">${d.label}</div><div class="t"><div class="f" style="width:${(s[d.key] / MAX_SCORE) * 100}%"></div></div><div class="v">${n1(s[d.key])}</div></div>`).join('')}
         <p class="hint">${s.count} 人评过${p.avgCost ? ` · 人均 ¥${esc(p.avgCost)}` : ''}</p>
       </div>` : '<div class="card"><p class="hint">还没人评分，来当第一个。</p></div>'}
 
       <div class="list">
         ${list.map(r => {
-          const total = DIMS.reduce((a, d) => a + (Number(r[d.key]) || 0), 0) / DIMS.length;
+          const total = ratingTotal(r);
           return `<div class="rate-item">
             <div class="rate-head">
               <div class="avatar" style="background:${avatarColor(r.nick)}">${esc(r.nick.slice(0, 1))}</div>
@@ -182,7 +182,7 @@
     $('#pick-search').value = '';
     $('#add-tip').textContent = '';
     renderPickList('');
-    renderStars();
+    renderDims();
     renderTagChips();
   }
 
@@ -255,22 +255,51 @@
     $('#step-rate').hidden = false;
     $('#picked-name').innerHTML = esc(place.name) +
       `<small>${esc(place.category || '未分类')}${place.avgCost ? ' · 人均 ¥' + esc(place.avgCost) : ''}${isNew ? ' · 新店' : ''}</small>`;
-    renderStars();
+    renderDims();
     renderTagChips();
   }
 
-  function renderStars() {
-    $$('.stars').forEach(box => {
-      const dim = box.dataset.dim;
-      const v = UI.draft.scores[dim] || 0;
-      box.innerHTML = [1, 2, 3, 4, 5].map(i => `<span class="star${i <= v ? ' on' : ''}" data-i="${i}">★</span>`).join('');
-      const valEl = box.parentElement.querySelector('.dim-val');
-      if (valEl) valEl.textContent = v ? v + '.0' : '-';
-      $$('.star', box).forEach(s => s.addEventListener('click', () => {
-        const i = Number(s.dataset.i);
-        UI.draft.scores[dim] = (UI.draft.scores[dim] === i) ? 0 : i;   // 再点一次取消
-        renderStars();
-      }));
+  /** 生成 6 个维度的 1-10 打分条（只建一次，之后只重绘状态） */
+  function renderDims() {
+    const box = $('#dim-block');
+    if (!box.dataset.built) {
+      box.innerHTML = DIMS.map(d => `
+        <div class="dim-row">
+          <div class="dim-head">
+            <span class="dim-name">${esc(d.label)}</span>
+            <span class="dim-val" data-val="${d.key}">-</span>
+          </div>
+          <div class="num-scale" data-dim="${d.key}">
+            ${Array.from({ length: MAX_SCORE }, (_, i) => `<button class="num" data-v="${i + 1}">${i + 1}</button>`).join('')}
+          </div>
+        </div>`).join('');
+
+      $$('.num-scale', box).forEach(scale => {
+        const dim = scale.dataset.dim;
+        $$('.num', scale).forEach(btn => btn.addEventListener('click', () => {
+          const v = Number(btn.dataset.v);
+          UI.draft.scores[dim] = (UI.draft.scores[dim] === v) ? 0 : v;   // 再点一次取消
+          paintDims();
+        }));
+      });
+      box.dataset.built = '1';
+    }
+    paintDims();
+  }
+
+  function paintDims() {
+    DIMS.forEach(d => {
+      const v = UI.draft.scores[d.key] || 0;
+      const scale = $('.num-scale[data-dim="' + d.key + '"]');
+      if (scale) {
+        $$('.num', scale).forEach(btn => {
+          const n = Number(btn.dataset.v);
+          const cur = n === v;
+          btn.className = 'num' + (n <= v ? ' on' : '') + (cur ? ' cur ' + (v <= 3 ? 'lv1' : v <= 6 ? 'lv2' : v <= 8 ? 'lv3' : 'lv4') : '');
+        });
+      }
+      const valEl = $('.dim-val[data-val="' + d.key + '"]');
+      if (valEl) valEl.textContent = v ? v : '-';
     });
   }
 
@@ -289,7 +318,7 @@
 
   $('#btn-submit').addEventListener('click', async () => {
     const s = UI.draft.scores;
-    if (DIMS.every(d => !s[d.key])) return toast('至少给「味道」打个分');
+    if (DIMS.every(d => !s[d.key])) return toast('至少打一个维度的分');
     const btn = $('#btn-submit');
     btn.disabled = true; btn.textContent = '提交中…';
     try {
@@ -304,12 +333,12 @@
         id: d.editingId || ('r_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)),
         placeId: d.place.id,
         placeName: d.place.name,
-        taste: s.taste || 0, env: s.env || 0, service: s.service || 0, value: s.value || 0,
         comment: $('#r-comment').value.trim(),
         tags: d.tags.slice(),
         visitedAt: $('#r-date').value || today(),
         updatedAt: new Date().toISOString()
       };
+      DIMS.forEach(x => { rec[x.key] = Number(s[x.key]) || 0; });
       const idx = ratings.findIndex(r => r.id === rec.id);
       if (idx >= 0) ratings[idx] = rec; else ratings.push(rec);
 
@@ -336,7 +365,7 @@
 
     const byPlace = ratings.reduce((m, r) => { m[r.placeId] = r; return m; }, {});
     const best = ratings.map(r => {
-      const t = DIMS.reduce((a, d) => a + (Number(r[d.key]) || 0), 0) / DIMS.length;
+      const t = ratingTotal(r);
       return { r, t };
     }).sort((a, b) => b.t - a.t)[0];
 
@@ -347,15 +376,15 @@
         <div class="stat"><b>${Store.places.length}</b><span>收录店</span></div>
       </div>
       ${ratings.length ? `<div style="margin-top:14px">
-        ${DIMS.map(d => `<div class="taste-line"><div class="l">${d.label}</div><div class="t"><div class="f" style="width:${(s[d.key] / 5) * 100}%"></div></div><div class="v">${n1(s[d.key])}</div></div>`).join('')}
-        <p class="hint">你在「${DIMS.reduce((a, d) => (s[d.key] > s[a.key] ? d : a), DIMS[0]).label}」上要求最高${best ? ` · 最高分：${esc(best.r.placeName)} ${n1(best.t)}` : ''}</p>
+        ${DIMS.map(d => `<div class="taste-line"><div class="l">${d.label}</div><div class="t"><div class="f" style="width:${(s[d.key] / MAX_SCORE) * 100}%"></div></div><div class="v">${n1(s[d.key])}</div></div>`).join('')}
+        <p class="hint">最满意「${DIMS.reduce((a, d) => (s[d.key] > s[a.key] ? d : a), DIMS[0]).label}」${best ? ` · 最高分：${esc(best.r.placeName)} ${n1(best.t)}` : ''}</p>
       </div>` : '<p class="hint" style="margin-top:12px">还没有评分记录，去「记一笔」开张。</p>'}
     `;
 
     const rows = ratings.slice().sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
     $('#my-list').innerHTML = rows.map(r => {
       const p = Store.placeById(r.placeId);
-      const t = DIMS.reduce((a, d) => a + (Number(r[d.key]) || 0), 0) / DIMS.length;
+      const t = ratingTotal(r);
       return `<div class="pcard" data-id="${esc(r.placeId)}">
         <div class="pcard-head">
           <div class="pcard-name">${esc(r.placeName || (p && p.name) || '未知')}</div>

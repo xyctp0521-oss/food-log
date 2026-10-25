@@ -287,22 +287,37 @@
   }
 
   /* ---------- 计算 ---------- */
+  const MAX_SCORE = 10;
+
+  // 全部同向：分越高越好（「价格」= 越实惠分越高）
   const DIMS = [
     { key: 'taste', label: '味道' },
     { key: 'env', label: '环境' },
     { key: 'service', label: '服务' },
-    { key: 'value', label: '性价比' }
+    { key: 'price', label: '价格', hint: '越实惠越高' },
+    { key: 'hygiene', label: '卫生' },
+    { key: 'speed', label: '等位', hint: '越快越高' }
   ];
 
+  /** 单条评分：只对填了的维度求平均 */
+  function ratingTotal(r) {
+    const vals = DIMS.map(d => Number(r[d.key]) || 0).filter(v => v > 0);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }
+
+  /** 汇总某店铺的所有评分：各维度平均 + 综合平均 */
   function summarize(ratings) {
     const out = { count: ratings.length, total: 0 };
     DIMS.forEach(d => { out[d.key] = 0; });
     if (!ratings.length) return out;
+
     DIMS.forEach(d => {
       const arr = ratings.map(r => Number(r[d.key]) || 0).filter(v => v > 0);
       out[d.key] = arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
     });
-    out.total = DIMS.reduce((s, d) => s + out[d.key], 0) / DIMS.length;
+    // 综合分：只把「有评分」的维度纳入平均，避免空缺维度拉低总分
+    const valid = DIMS.map(d => out[d.key]).filter(v => v > 0);
+    out.total = valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
     return out;
   }
 
@@ -314,5 +329,5 @@
   }
 
   global.Store = Store;
-  global.FoodUtil = { DIMS, summarize, avatarColor, nickHash, uid, nowISO };
+  global.FoodUtil = { DIMS, MAX_SCORE, summarize, ratingTotal, avatarColor, nickHash, uid, nowISO };
 })(window);
