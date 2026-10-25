@@ -100,6 +100,22 @@
       <div class="dim-block" id="dim-block"></div>
       <p class="hint" style="margin-top:8px">满分 10 分，同向打分：价格填「实惠程度」、等位填「出餐速度」，越高分越好。可不全填。</p>
 
+      <label class="lbl">本次吃了什么</label>
+      <div id="dish-list"></div>
+      <button class="btn-ghost full" id="btn-add-dish">＋ 加一道菜</button>
+
+      <label class="lbl">账单</label>
+      <div class="row2" style="margin-top:0">
+        <input type="number" id="r-bill" placeholder="总金额（元）" inputmode="decimal">
+        <input type="number" id="r-people" placeholder="几人吃" inputmode="numeric">
+      </div>
+      <p class="hint" id="bill-hint">填了金额和人数会自动算人均</p>
+
+      <label class="lbl">照片</label>
+      <div class="photo-grid" id="photo-grid"></div>
+      <input type="file" id="photo-input" accept="image/*" multiple hidden>
+      <button class="btn-ghost full" id="btn-add-photo">＋ 添加照片</button>
+
       <label class="lbl">标签</label>
       <div class="chips pick-chips" id="tag-chips"></div>
 
@@ -190,6 +206,8 @@
 </div>
 
 <div class="toast" id="toast" hidden></div>
+
+<div class="lightbox" id="lightbox" hidden><img id="lightbox-img" alt=""></div>
 
 <script src="js/remote.js"></script>
 <script src="js/store.js"></script>

@@ -264,3 +264,39 @@ textarea{resize:none;line-height:1.6}
 .me-info b{font-size:16px}
 .me-info span{font-size:11px;color:var(--ink-2)}
 .me-row .btn-ghost{margin-left:auto;padding:8px 14px;font-size:13px;flex:0 0 auto}
+
+/* ---------- 菜品清单 ---------- */
+.dish-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.dish-row input{margin-bottom:0}
+.dish-row .dish-name{flex:2.2;min-width:0}
+.dish-row .dish-price{flex:1;min-width:0}
+.dish-del{
+  flex:0 0 auto;width:30px;height:38px;border-radius:9px;border:1px solid var(--line);
+  background:#fff;color:var(--ink-2);font-size:16px;cursor:pointer;line-height:1;padding:0;
+}
+.dish-del:active{background:#FDECEA;color:var(--bad)}
+
+/* ---------- 照片 ---------- */
+.photo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
+.photo-grid:empty{display:none}
+.photo-item{position:relative;aspect-ratio:1;border-radius:9px;overflow:hidden;background:var(--line)}
+.photo-item img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-del{
+  position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;
+  border:0;background:rgba(0,0,0,.55);color:#fff;font-size:11px;line-height:1;padding:0;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.detail-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+.detail-photos img{
+  width:100%;aspect-ratio:1;object-fit:cover;border-radius:9px;
+  display:block;cursor:zoom-in;background:var(--line);
+}
+.dish-table{width:100%;border-collapse:collapse;font-size:13px}
+.dish-table td{padding:6px 0;border-bottom:1px dashed var(--line)}
+.dish-table td:last-child{text-align:right;font-weight:700;white-space:nowrap}
+.dish-table tr:last-child td{border-bottom:0}
+.bill-row{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;font-size:13px;color:var(--ink-2)}
+.bill-row b{font-size:18px;color:var(--brand)}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px}
+.lightbox[hidden]{display:none}
+.lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px}

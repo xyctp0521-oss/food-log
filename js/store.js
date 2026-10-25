@@ -27,6 +27,59 @@
     try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.warn('缓存写入失败', e); }
   }
 
+  /* ---------- 照片本地缓存（IndexedDB，localStorage 装不下图） ---------- */
+  const IDB_NAME = 'foodlog-db';
+  const IDB_STORE = 'photos';
+  let idbPromise = null;
+
+  function openIDB() {
+    if (idbPromise) return idbPromise;
+    idbPromise = new Promise((resolve, reject) => {
+      if (!global.indexedDB) return reject(new Error('浏览器不支持 IndexedDB'));
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('IndexedDB 打开失败'));
+    });
+    return idbPromise;
+  }
+
+  function idbTx(mode, fn) {
+    return openIDB().then(db => new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, mode);
+      let out;
+      const req = fn(tx.objectStore(IDB_STORE));
+      if (req) req.onsuccess = () => { out = req.result; };
+      tx.oncomplete = () => res(out);
+      tx.onerror = () => rej(tx.error);
+      tx.onabort = () => rej(tx.error);
+    }));
+  }
+
+  const idbPut = (k, v) => idbTx('readwrite', s => s.put(v, k));
+  const idbGet = (k) => idbTx('readonly', s => s.get(k));
+  const idbDel = (k) => idbTx('readwrite', s => s.delete(k));
+
+  function bufToB64(buf) {
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    const CH = 0x8000;
+    for (let i = 0; i < bytes.length; i += CH) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    }
+    return btoa(bin);
+  }
+
+  function b64ToBlob(b64, type) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: type || 'image/jpeg' });
+  }
+
   /* ---------- 登录会话（首次登录后长期记住） ---------- */
   const SESSION_KEY = 'foodlog:session';
   function sessionNick() {
@@ -159,6 +212,11 @@
           (remote, local) => mergeRatingsFile(remote, local.ratings, nick)
         );
         this.userFiles[fileName] = { nick, ratings: op.ratings };
+      } else if (op.type === 'photo') {
+        const blob = await this.getPhotoLocal(op.photoId);
+        if (!blob) return;                      // 本地也找不到，只能放弃
+        const b64 = bufToB64(await blob.arrayBuffer());
+        await this.client.putBase64(`data/photos/${op.photoId}.jpg`, b64, `照片 ${op.photoId}`);
       }
       this._persist();
     },
@@ -191,6 +249,45 @@
       } catch (e) {
         queueRatings(this, nick, ratings);
         throw e;
+      }
+    },
+
+    /* ---------- 照片 ---------- */
+    async savePhotoLocal(photoId, blob) {
+      try { await idbPut(photoId, blob); return true; }
+      catch (e) { console.warn('本地存图失败', e.message); return false; }
+    },
+    async getPhotoLocal(photoId) {
+      try { return await idbGet(photoId); } catch (e) { return null; }
+    },
+    async removePhotoLocal(photoId) {
+      try { await idbDel(photoId); } catch (e) { /* ignore */ }
+    },
+    /** 上传单张照片；离线或失败则入队，下次自动补 */
+    async uploadPhoto(photoId) {
+      if (!this.ready) { queuePhoto(this, photoId); return { queued: true }; }
+      try {
+        await this._runOp({ type: 'photo', photoId });
+        return { ok: true };
+      } catch (e) {
+        queuePhoto(this, photoId);
+        throw e;
+      }
+    },
+    /** 取照片：本地优先，没有再拉云端并缓存到本地 */
+    async loadPhoto(photoId) {
+      const local = await this.getPhotoLocal(photoId);
+      if (local) return local;
+      if (!this.client || !this.client.ready) return null;
+      try {
+        const b64 = await this.client.getRawBase64(`data/photos/${photoId}.jpg`);
+        if (!b64) return null;
+        const blob = b64ToBlob(b64);
+        await idbPut(photoId, blob);
+        return blob;
+      } catch (e) {
+        console.warn('拉取照片失败', photoId, e.message);
+        return null;
       }
     },
 
@@ -283,6 +380,11 @@
   function queueRatings(store, nick, ratings) {
     store.pending = store.pending.filter(o => !(o.type === 'ratings' && o.nick === nick));
     store.pending.push({ type: 'ratings', nick, ratings });
+    store._persist();
+  }
+  function queuePhoto(store, photoId) {
+    store.pending = store.pending.filter(o => !(o.type === 'photo' && o.photoId === photoId));
+    store.pending.push({ type: 'photo', photoId });
     store._persist();
   }
 

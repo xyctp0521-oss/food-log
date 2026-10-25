@@ -117,6 +117,43 @@
       }
     }
 
+    /** 直接写 base64 内容（图片等二进制），不走 JSON 序列化 */
+    async putBase64(path, b64, message, retries = 2) {
+      const enc = GitHubClient.encodePath(path);
+      let attempt = 0;
+      while (attempt <= retries) {
+        let sha = null;
+        try {
+          const d = await this.request('GET', enc);
+          if (d && d.sha) sha = d.sha;
+        } catch (e) { if (e.status !== 404) throw e; }
+
+        try {
+          const body = { message: message || 'upload', content: b64, branch: this.branch };
+          if (sha) body.sha = sha;
+          await this.request('PUT', enc, body);
+          return true;
+        } catch (e) {
+          const retryable = e.status === 409 || e.status === 422 || e.status === 400;
+          if (retryable && attempt < retries) { attempt++; continue; }
+          throw e;
+        }
+      }
+      throw new RemoteError('照片上传重试失败', 0, null);
+    }
+
+    /** 读原始 base64（图片），不存在返回 null */
+    async getRawBase64(path) {
+      const enc = GitHubClient.encodePath(path);
+      try {
+        const d = await this.request('GET', enc);
+        return d && d.content ? String(d.content).replace(/\s/g, '') : null;
+      } catch (e) {
+        if (e.status === 404) return null;
+        throw e;
+      }
+    }
+
     /** 校验仓库本身可访问（设置页「测试连接」用，能区分仓库不存在 / 令牌无效） */
     async checkRepo() {
       const url = `${API}/repos/${encodeURIComponent(this.owner)}/${encodeURIComponent(this.repo)}`;

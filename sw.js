@@ -1,7 +1,7 @@
 /* Service Worker：只缓存本站静态资源，保证没信号时也能打开记账
  * GitHub API 属跨域请求，不拦截，始终走网络
  */
-const CACHE = 'foodlog-v4';
+const CACHE = 'foodlog-v5';
 const ASSETS = [
   './',
   './index.html',

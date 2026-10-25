@@ -31,7 +31,7 @@
   const UI = {
     page: 'page-rank',
     q: '', cat: '', sort: 'score',
-    draft: { place: null, placeIsNew: false, scores: {}, tags: [], editingId: null },
+    draft: { place: null, placeIsNew: false, scores: {}, tags: [], editingId: null, dishes: [], photos: [] },
     openPlaceId: null
   };
 
@@ -125,6 +125,10 @@
     const list = Store.ratingsOf(id);
     const s = summarize(list);
     const my = list.find(r => r.nick === Store.myNick());
+    // 有人填了账单+人数时，用真实人均顶掉手动填的参考值
+    const ppArr = list.map(r => (r.bill && r.people) ? r.bill / r.people : 0).filter(v => v > 0);
+    const realPP = ppArr.length ? ppArr.reduce((a, b) => a + b, 0) / ppArr.length : 0;
+    const perPerson = realPP || Number(p.avgCost) || 0;
 
     $('#sheet').innerHTML = `
       <div class="close-bar">
@@ -132,10 +136,12 @@
         <h2>${esc(p.name)}</h2>
         <div class="pcard-meta">
           ${p.category ? `<span>${esc(p.category)}</span><span class="dot">·</span>` : ''}
-          ${p.avgCost ? `<span>人均 ¥${esc(p.avgCost)}</span><span class="dot">·</span>` : ''}
+          ${perPerson ? `<span>人均 ¥${perPerson.toFixed(0)}</span><span class="dot">·</span>` : ''}
           ${p.address ? `<span>${esc(p.address)}</span>` : ''}
         </div>
       </div>
+
+      <div class="detail-photos" id="detail-photos" hidden></div>
 
       ${s.count ? `<div class="card">
         <div class="taste-line"><div class="l">综合</div><div class="t"><div class="f" style="width:${(s.total / MAX_SCORE) * 100}%"></div></div><div class="v">${n1(s.total)}</div></div>
@@ -155,6 +161,8 @@
             <div class="rate-bars">${DIMS.map(d => `<div class="bar"><div class="bar-t">${d.label}</div>${bar(r[d.key])}</div>`).join('')}</div>
             ${r.comment ? `<div class="rate-cmt">${esc(r.comment)}</div>` : ''}
             ${(r.tags || []).length ? `<div class="tagline">${r.tags.map(t => `<span class="mini-tag${NEG_TAGS.includes(t) ? ' bad' : ''}">${esc(t)}</span>`).join('')}</div>` : ''}
+            ${(r.dishes || []).length ? `<table class="dish-table">${r.dishes.map(x => `<tr><td>${esc(x.name)}</td><td>${x.price ? '¥' + x.price : ''}</td></tr>`).join('')}</table>` : ''}
+            ${r.bill ? `<div class="bill-row"><span>账单 ¥${r.bill}${r.people ? ` / ${r.people} 人` : ''}</span><b>${r.people ? `人均 ¥${(r.bill / r.people).toFixed(1)}` : `¥${r.bill}`}</b></div>` : ''}
             <div class="rate-date">${esc(r.visitedAt || '')}</div>
             ${r.nick === Store.myNick() ? `<div class="rate-edit" data-edit="${esc(r.id)}">修改我的评分</div>` : ''}
           </div>`;
@@ -164,26 +172,59 @@
       <button class="btn-main" id="sheet-rate">${my ? '修改我的评分' : '我也评一下'}</button>
     `;
     $('#sheet-mask').hidden = false;
+
+    // 异步载入这家店所有照片（本地优先，没有就拉云端）
+    const photoIds = [];
+    list.forEach(r => (r.photos || []).forEach(ph => photoIds.push(ph.id)));
+    const pbox = $('#detail-photos');
+    if (photoIds.length && pbox) {
+      pbox.hidden = false;
+      UI.sheetUrls = UI.sheetUrls || [];
+      (async () => {
+        for (const pid of photoIds) {
+          const blob = await Store.loadPhoto(pid);
+          if (!blob) continue;
+          const url = URL.createObjectURL(blob);
+          UI.sheetUrls.push(url);
+          const im = document.createElement('img');
+          im.src = url;
+          im.alt = '';
+          im.addEventListener('click', () => openLightbox(url));
+          pbox.appendChild(im);
+        }
+      })();
+    }
+
     $('#sheet-x').addEventListener('click', closeSheet);
     $('#sheet-rate').addEventListener('click', () => { closeSheet(); startRate(p, my || null); });
     $$('#sheet [data-edit]').forEach(el => el.addEventListener('click', () => {
       closeSheet(); startRate(p, my || null);
     }));
   }
-  function closeSheet() { $('#sheet-mask').hidden = true; UI.openPlaceId = null; }
+  function closeSheet() {
+    (UI.sheetUrls || []).forEach(u => URL.revokeObjectURL(u));
+    UI.sheetUrls = [];
+    $('#sheet-mask').hidden = true;
+    UI.openPlaceId = null;
+  }
   $('#sheet-mask').addEventListener('click', e => { if (e.target.id === 'sheet-mask') closeSheet(); });
 
   /* ================= 记一笔 ================= */
   function resetAdd() {
-    UI.draft = { place: null, placeIsNew: false, scores: {}, tags: [], editingId: null };
+    (UI.draft.photos || []).forEach(p => { if (p.url) URL.revokeObjectURL(p.url); });   // 释放预览内存
+    UI.draft = { place: null, placeIsNew: false, scores: {}, tags: [], editingId: null, dishes: [], photos: [] };
     $('#step-pick').hidden = false;
     $('#step-newplace').hidden = true;
     $('#step-rate').hidden = true;
     $('#pick-search').value = '';
     $('#add-tip').textContent = '';
+    $('#r-bill').value = '';
+    $('#r-people').value = '';
     renderPickList('');
     renderDims();
     renderTagChips();
+    renderDishes();
+    renderPhotoGrid();
   }
 
   function renderPickList(q) {
@@ -237,17 +278,37 @@
       placeIsNew: !!isNew,
       scores: {},
       tags: [],
-      editingId: existing ? existing.id : null
+      editingId: existing ? existing.id : null,
+      dishes: [],
+      photos: []
     };
     if (existing) {
       DIMS.forEach(d => { UI.draft.scores[d.key] = existing[d.key] || 0; });
       UI.draft.tags = (existing.tags || []).slice();
+      UI.draft.dishes = (existing.dishes || []).map(x => ({ name: x.name || '', price: x.price || '' }));
       $('#r-comment').value = existing.comment || '';
       $('#r-date').value = existing.visitedAt || today();
+      $('#r-bill').value = existing.bill || '';
+      $('#r-people').value = existing.people || '';
+
+      // 已有照片：先占位，再异步从本地/云端取回预览
+      const oldPhotos = existing.photos || [];
+      if (oldPhotos.length) {
+        UI.draft.photos = oldPhotos.map(ph => ({ id: ph.id, url: '' }));
+        renderPhotoGrid();
+        (async () => {
+          for (const p of UI.draft.photos) {
+            const blob = await Store.loadPhoto(p.id);
+            if (blob) { p.url = URL.createObjectURL(blob); renderPhotoGrid(); }
+          }
+        })();
+      }
     } else {
       DIMS.forEach(d => { UI.draft.scores[d.key] = 0; });
       $('#r-comment').value = '';
       $('#r-date').value = today();
+      $('#r-bill').value = '';
+      $('#r-people').value = '';
     }
 
     $('#step-pick').hidden = true;
@@ -257,6 +318,8 @@
       `<small>${esc(place.category || '未分类')}${place.avgCost ? ' · 人均 ¥' + esc(place.avgCost) : ''}${isNew ? ' · 新店' : ''}</small>`;
     renderDims();
     renderTagChips();
+    renderDishes();
+    renderPhotoGrid();
   }
 
   /** 生成 6 个维度的 1-10 打分条（只建一次，之后只重绘状态） */
@@ -314,6 +377,136 @@
     }));
   }
 
+  /* ================= 菜品清单 ================= */
+  function renderDishes() {
+    const box = $('#dish-list');
+    if (!UI.draft.dishes.length) UI.draft.dishes.push({ name: '', price: '' });
+
+    box.innerHTML = UI.draft.dishes.map((d, i) =>
+      `<div class="dish-row" data-i="${i}">
+        <input type="text" class="dish-name" placeholder="菜名" value="${esc(d.name)}">
+        <input type="number" class="dish-price" placeholder="价格" inputmode="decimal" value="${esc(d.price)}">
+        <button class="dish-del" title="删掉">✕</button>
+      </div>`).join('');
+
+    $$('#dish-list .dish-row').forEach(row => {
+      const i = Number(row.dataset.i);
+      // 输入时不重绘，否则会丢焦点
+      $('.dish-name', row).addEventListener('input', e => { UI.draft.dishes[i].name = e.target.value; });
+      $('.dish-price', row).addEventListener('input', e => {
+        UI.draft.dishes[i].price = e.target.value;
+        updateBillHint();
+      });
+      $('.dish-del', row).addEventListener('click', () => {
+        UI.draft.dishes.splice(i, 1);
+        renderDishes();
+        updateBillHint();
+      });
+    });
+    updateBillHint();
+  }
+
+  function updateBillHint() {
+    const bill = Number($('#r-bill').value) || 0;
+    const people = Number($('#r-people').value) || 0;
+    const dishSum = UI.draft.dishes.reduce((s, d) => s + (Number(d.price) || 0), 0);
+    const parts = [];
+    if (bill && people) parts.push(`人均 ¥${(bill / people).toFixed(1)}`);
+    if (dishSum) parts.push(`菜品合计 ¥${dishSum}`);
+    if (bill && dishSum && Math.abs(bill - dishSum) >= 1) {
+      parts.push(`与账单差 ¥${(bill - dishSum).toFixed(0)}`);
+    }
+    $('#bill-hint').textContent = parts.length ? parts.join(' · ') : '填了金额和人数会自动算人均';
+  }
+
+  /* ================= 照片 ================= */
+  const MAX_PHOTOS = 9;
+
+  /** 压缩到长边 1280、JPEG 0.72，一张约 100~200KB */
+  function compressImage(file, maxSide, quality) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let w = img.naturalWidth, h = img.naturalHeight;
+        const scale = Math.min(1, maxSide / Math.max(w, h));
+        w = Math.max(1, Math.round(w * scale));
+        h = Math.max(1, Math.round(h * scale));
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        cv.toBlob(b => (b ? resolve(b) : reject(new Error('压缩失败'))), 'image/jpeg', quality);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读不出来')); };
+      img.src = url;
+    });
+  }
+
+  async function handlePhotoFiles(files) {
+    const room = MAX_PHOTOS - UI.draft.photos.length;
+    if (room <= 0) return toast(`最多 ${MAX_PHOTOS} 张`);
+    const list = Array.from(files).slice(0, room);
+
+    for (let k = 0; k < list.length; k++) {
+      try {
+        const blob = await compressImage(list[k], 1280, 0.72);
+        const id = 'ph_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        await Store.savePhotoLocal(id, blob);
+        UI.draft.photos.push({ id, url: URL.createObjectURL(blob) });
+        renderPhotoGrid();
+      } catch (e) {
+        toast('有张图没处理成功：' + e.message);
+      }
+    }
+    if (list.length) toast(`已添加 ${list.length} 张`);
+  }
+
+  function renderPhotoGrid() {
+    $('#photo-grid').innerHTML = UI.draft.photos.map(p =>
+      `<div class="photo-item" data-id="${esc(p.id)}">
+        ${p.url ? `<img src="${p.url}" alt="">` : ''}
+        <button class="photo-del" data-del="${esc(p.id)}" title="删掉">✕</button>
+      </div>`).join('');
+
+    $$('#photo-grid .photo-del').forEach(btn => btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = btn.dataset.del;
+      const i = UI.draft.photos.findIndex(p => p.id === id);
+      if (i >= 0) {
+        const p = UI.draft.photos.splice(i, 1)[0];
+        if (p.url) URL.revokeObjectURL(p.url);
+      }
+      renderPhotoGrid();
+    }));
+  }
+
+  function openLightbox(url) {
+    if (!url) return;
+    $('#lightbox-img').src = url;
+    $('#lightbox').hidden = false;
+  }
+  $('#lightbox').addEventListener('click', () => {
+    $('#lightbox').hidden = true;
+    $('#lightbox-img').src = '';
+  });
+
+  $('#btn-add-dish').addEventListener('click', () => {
+    UI.draft.dishes.push({ name: '', price: '' });
+    renderDishes();
+  });
+  $('#btn-add-photo').addEventListener('click', () => $('#photo-input').click());
+  $('#photo-input').addEventListener('change', async e => {
+    const files = e.target.files;
+    if (files && files.length) await handlePhotoFiles(files);
+    e.target.value = '';
+  });
+  $('#r-bill').addEventListener('input', updateBillHint);
+  $('#r-people').addEventListener('input', updateBillHint);
+
   $('#btn-rate-cancel').addEventListener('click', resetAdd);
 
   $('#btn-submit').addEventListener('click', async () => {
@@ -339,13 +532,28 @@
         updatedAt: new Date().toISOString()
       };
       DIMS.forEach(x => { rec[x.key] = Number(s[x.key]) || 0; });
+
+      rec.dishes = d.dishes
+        .filter(x => String(x.name || '').trim())
+        .map(x => ({ name: String(x.name).trim(), price: Number(x.price) || 0 }));
+      rec.bill = Number($('#r-bill').value) || 0;
+      rec.people = Number($('#r-people').value) || 0;
+      rec.photos = d.photos.map(p => ({ id: p.id }));
+
       const idx = ratings.findIndex(r => r.id === rec.id);
       if (idx >= 0) ratings[idx] = rec; else ratings.push(rec);
 
       const res = await Store.saveMyRatings(ratings);
+
+      // 照片单独上传；失败的进队列，下次打开自动补
+      let photoFail = 0;
+      for (const p of d.photos) {
+        try { await Store.uploadPhoto(p.id); } catch (e) { photoFail++; }
+      }
       $('#add-tip').className = 'tip ok';
       $('#add-tip').textContent = res.queued ? '已存本地，联网后自动补交' : '提交成功';
-      toast(res.queued ? '离线保存了，联网后再传' : '记下了 ✓');
+      if (photoFail) toast(`${photoFail} 张照片没传上去，联网后自动补`, 2800);
+      else toast(res.queued ? '离线保存了，联网后再传' : '记下了 ✓');
       setTimeout(() => { resetAdd(); go('page-rank'); }, 900);
     } catch (e) {
       $('#add-tip').className = 'tip err';
