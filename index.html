@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#FF6B35">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="探店簿">
+<title>探店簿 · 小伙伴的美食账本</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+  <!-- ================= 榜单页 ================= -->
+  <section class="page" id="page-rank">
+    <header class="topbar">
+      <div>
+        <h1 class="brand">探店簿</h1>
+        <p class="sub" id="rank-sub">加载中…</p>
+      </div>
+      <button class="icon-btn" id="btn-sync" title="同步">⟳</button>
+    </header>
+
+    <div class="search-wrap">
+      <input type="search" id="search" placeholder="搜店名 / 品类 / 地址" autocomplete="off">
+    </div>
+
+    <div class="chips" id="cat-chips"></div>
+
+    <div class="sortbar">
+      <button class="sort-btn active" data-sort="score">综合分</button>
+      <button class="sort-btn" data-sort="count">评价数</button>
+      <button class="sort-btn" data-sort="cost">人均</button>
+      <button class="sort-btn" data-sort="new">最新</button>
+    </div>
+
+    <div class="list" id="place-list"></div>
+    <div class="empty" id="rank-empty" hidden>
+      <div class="empty-emoji">🍜</div>
+      <p>还没有记录</p>
+      <p class="dim">点下面「记一笔」开张</p>
+    </div>
+  </section>
+
+  <!-- ================= 记一笔页 ================= -->
+  <section class="page" id="page-add" hidden>
+    <header class="topbar"><div><h1 class="brand">记一笔</h1><p class="sub">吃过就记，别等忘了</p></div></header>
+
+    <!-- 步骤1 选店 -->
+    <div class="card" id="step-pick">
+      <label class="lbl">哪家店？</label>
+      <input type="text" id="pick-search" placeholder="输入店名，没有就新建" autocomplete="off">
+      <div class="pick-list" id="pick-list"></div>
+      <button class="btn-ghost full" id="btn-new-place">＋ 新建一家店</button>
+    </div>
+
+    <!-- 步骤2 新建店铺 -->
+    <div class="card" id="step-newplace" hidden>
+      <label class="lbl">新建店铺</label>
+      <input type="text" id="np-name" placeholder="店名 *">
+      <div class="row2">
+        <input type="text" id="np-cat" placeholder="品类（如 湘菜）" list="cat-list">
+        <input type="number" id="np-cost" placeholder="人均（元）" inputmode="numeric">
+      </div>
+      <datalist id="cat-list"></datalist>
+      <input type="text" id="np-addr" placeholder="地址（选填）">
+      <div class="row2">
+        <button class="btn-ghost" id="btn-np-cancel">取消</button>
+        <button class="btn-main" id="btn-np-next">下一步</button>
+      </div>
+    </div>
+
+    <!-- 步骤3 打分 -->
+    <div class="card" id="step-rate" hidden>
+      <div class="picked" id="picked-name"></div>
+
+      <div class="dim-block">
+        <div class="dim-row" data-dim="taste"><span class="dim-name">味道</span><div class="stars" data-dim="taste"></div><span class="dim-val">-</span></div>
+        <div class="dim-row" data-dim="env"><span class="dim-name">环境</span><div class="stars" data-dim="env"></div><span class="dim-val">-</span></div>
+        <div class="dim-row" data-dim="service"><span class="dim-name">服务</span><div class="stars" data-dim="service"></div><span class="dim-val">-</span></div>
+        <div class="dim-row" data-dim="value"><span class="dim-name">性价比</span><div class="stars" data-dim="value"></div><span class="dim-val">-</span></div>
+      </div>
+
+      <label class="lbl">标签</label>
+      <div class="chips pick-chips" id="tag-chips"></div>
+
+      <label class="lbl">短评</label>
+      <textarea id="r-comment" rows="2" placeholder="一两句就行，比如「擂辣椒茄子封神，米饭免费续」"></textarea>
+
+      <label class="lbl">去的日期</label>
+      <input type="date" id="r-date">
+
+      <div class="row2" style="margin-top:14px">
+        <button class="btn-ghost" id="btn-rate-cancel">重选店</button>
+        <button class="btn-main" id="btn-submit">提交评分</button>
+      </div>
+    </div>
+
+    <div class="tip" id="add-tip"></div>
+  </section>
+
+  <!-- ================= 我的 ================= -->
+  <section class="page" id="page-me" hidden>
+    <header class="topbar"><div><h1 class="brand" id="me-name">我</h1><p class="sub" id="me-sub">我的口味档案</p></div></header>
+    <div class="card" id="profile-card"></div>
+    <div class="list" id="my-list"></div>
+    <div class="empty" id="me-empty" hidden><div class="empty-emoji">🥢</div><p>还没评过</p></div>
+  </section>
+
+  <!-- ================= 设置 ================= -->
+  <section class="page" id="page-set" hidden>
+    <header class="topbar"><div><h1 class="brand">设置</h1><p class="sub">同步配置</p></div></header>
+
+    <div class="card">
+      <label class="lbl">你的昵称</label>
+      <input type="text" id="set-nick" placeholder="比如 小羊">
+      <p class="hint">朋友们各自填自己的昵称，数据按昵称分开存，互不覆盖。</p>
+    </div>
+
+    <div class="card">
+      <label class="lbl">Gitee 同步</label>
+      <input type="text" id="set-owner" placeholder="Gitee 用户名（owner）">
+      <input type="text" id="set-repo" placeholder="仓库名（repo）">
+      <input type="password" id="set-token" placeholder="私人令牌 access_token">
+      <input type="text" id="set-branch" placeholder="分支（默认 master）" value="master">
+      <div class="row2">
+        <button class="btn-ghost" id="btn-test">测试连接</button>
+        <button class="btn-main" id="btn-save-set">保存</button>
+      </div>
+      <p class="hint" id="set-hint"></p>
+    </div>
+
+    <div class="card">
+      <label class="lbl">数据</label>
+      <div class="row2">
+        <button class="btn-ghost" id="btn-export">导出备份</button>
+        <button class="btn-ghost" id="btn-import">导入备份</button>
+      </div>
+      <input type="file" id="file-import" accept="application/json" hidden>
+      <p class="hint" id="sync-state"></p>
+    </div>
+
+    <div class="card">
+      <label class="lbl">说明</label>
+      <div class="about">
+        <p>· 数据存在你自己的 Gitee 仓库里，不经过任何第三方服务器。</p>
+        <p>· 没信号时照常记录，联网后会自动补交。</p>
+        <p>· 令牌只保存在这台设备上，换设备要重新填。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 底部导航 -->
+  <nav class="tabbar">
+    <button class="tab active" data-page="page-rank"><span>🏆</span>榜单</button>
+    <button class="tab" data-page="page-add"><span>✍️</span>记一笔</button>
+    <button class="tab" data-page="page-me"><span>🥢</span>我的</button>
+    <button class="tab" data-page="page-set"><span>⚙️</span>设置</button>
+  </nav>
+</div>
+
+<!-- 店铺详情弹层 -->
+<div class="sheet-mask" id="sheet-mask" hidden>
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="js/gitee.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
