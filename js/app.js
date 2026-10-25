@@ -20,18 +20,28 @@
   const n1 = v => (Math.round(Number(v || 0) * 10) / 10).toFixed(1);
   const bar = (v) => `<div class="bar-track"><div class="bar-fill" style="width:${Math.max(0, Math.min(100, (v / MAX_SCORE) * 100))}%"></div></div>`;
 
-  /** 花费展示：优先「花费 / 人数」，兼容旧数据的 avgCost */
+  /** 花费展示：取大家评价里账单的平均；旧数据退回店铺字段 */
   function costText(p) {
     if (!p) return '';
+    const rs = Store.ratingsOf(p.id).filter(r => Number(r.bill) > 0);
+    if (rs.length) {
+      const avg = rs.reduce((a, r) => a + Number(r.bill), 0) / rs.length;
+      const pp = rs.filter(r => Number(r.people) > 0);
+      const avgPp = pp.length ? pp.reduce((a, r) => a + Number(r.people), 0) / pp.length : 0;
+      return '¥' + Math.round(avg) + (avgPp ? ` / ${Math.round(avgPp)}人` : '');
+    }
     if (p.amount) return '¥' + p.amount + (p.people ? ` / ${p.people}人` : '');
     if (p.avgCost) return '人均 ¥' + p.avgCost;
     return '';
   }
-  /** 排序用：花费额（旧数据用 人均×人数 估算） */
+
+  /** 排序用：平均账单 */
   function costValue(p) {
     if (!p) return 0;
+    const bs = Store.ratingsOf(p.id).filter(r => Number(r.bill) > 0).map(r => Number(r.bill));
+    if (bs.length) return bs.reduce((a, b) => a + b, 0) / bs.length;
     if (p.amount) return Number(p.amount) || 0;
-    if (p.avgCost) return (Number(p.avgCost) || 0) * (Number(p.people) || 1);
+    if (p.avgCost) return Number(p.avgCost) || 0;
     return 0;
   }
 
@@ -46,7 +56,7 @@
   const UI = {
     page: 'page-rank',
     q: '', cat: '', sort: 'score',
-    draft: { place: null, placeIsNew: false, scores: {}, tags: [], editingId: null, dishes: [], photos: [] },
+    draft: { place: null, placeIsNew: false, scores: {}, tags: [], editingId: null, dishNotes: {}, newDishes: [], photos: [] },
     openPlaceId: null
   };
 
@@ -141,6 +151,35 @@
     const s = summarize(list);
     const my = list.find(r => r.nick === Store.myNick());
 
+    // 共享菜单 + 各人逐道点评
+    const menu = (p.dishes || []).slice();
+    const legacy = menu.length ? [] : Store.legacyDishesOf(id);
+    const notesMap = {};
+    list.forEach(r => {
+      Object.entries(r.dishNotes || {}).forEach(([did, txt]) => {
+        if (txt) (notesMap[did] = notesMap[did] || []).push({ nick: r.nick, text: txt });
+      });
+    });
+
+    const menuHtml = menu.length
+      ? `<div class="card">
+          <label class="lbl">菜单 <span class="lbl-note">${menu.length} 道</span></label>
+          ${menu.map(d => {
+            const rs = notesMap[d.id] || [];
+            return `<div class="menu-item">
+              <div class="menu-row"><span class="mn">${esc(d.name)}</span>${d.price ? `<span class="mp">¥${d.price}</span>` : ''}</div>
+              ${rs.map(x => `<div class="dish-review"><b>${esc(x.nick)}</b>${esc(x.text)}</div>`).join('')}
+            </div>`;
+          }).join('')}
+        </div>`
+      : (legacy.length
+        ? `<div class="card">
+            <label class="lbl">菜单 <span class="lbl-note">旧记录</span></label>
+            ${legacy.map(d => `<div class="menu-item"><div class="menu-row"><span class="mn">${esc(d.name)}</span>${d.price ? `<span class="mp">¥${d.price}</span>` : ''}</div></div>`).join('')}
+            <p class="hint">这些菜记在旧格式里，编辑一下那条评分就能并入共享菜单。</p>
+          </div>`
+        : '');
+
     $('#sheet').innerHTML = `
       <div class="close-bar">
         <button class="sheet-close" id="sheet-x">✕</button>
@@ -153,6 +192,8 @@
       </div>
 
       <div class="detail-photos" id="detail-photos" hidden></div>
+
+      ${menuHtml}
 
       ${s.count ? `<div class="card">
         <div class="taste-line"><div class="l">综合</div><div class="t"><div class="f" style="width:${(s.total / MAX_SCORE) * 100}%"></div></div><div class="v">${n1(s.total)}</div></div>
@@ -172,7 +213,6 @@
             <div class="rate-bars">${DIMS.map(d => `<div class="bar"><div class="bar-t">${d.label}</div>${bar(r[d.key])}</div>`).join('')}</div>
             ${r.comment ? `<div class="rate-cmt">${esc(r.comment)}</div>` : ''}
             ${(r.tags || []).length ? `<div class="tagline">${r.tags.map(t => `<span class="mini-tag${NEG_TAGS.includes(t) ? ' bad' : ''}">${esc(t)}</span>`).join('')}</div>` : ''}
-            ${(r.dishes || []).length ? `<table class="dish-table">${r.dishes.map(x => `<tr><td>${esc(x.name)}</td><td>${x.price ? '¥' + x.price : ''}</td></tr>`).join('')}</table>` : ''}
             ${r.bill ? `<div class="bill-row"><span>${r.people ? r.people + ' 人吃饭' : '本次账单'}</span><b>¥${r.bill}</b></div>` : ''}
             <div class="rate-date">${esc(r.visitedAt || '')}</div>
             ${r.nick === Store.myNick() ? `<div class="rate-edit" data-edit="${esc(r.id)}">修改我的评分</div>` : ''}
@@ -223,7 +263,7 @@
   /* ================= 记一笔 ================= */
   function resetAdd() {
     (UI.draft.photos || []).forEach(p => { if (p.url) URL.revokeObjectURL(p.url); });   // 释放预览内存
-    UI.draft = { place: null, placeIsNew: false, scores: {}, tags: [], editingId: null, dishes: [], photos: [] };
+    UI.draft = { place: null, placeIsNew: false, scores: {}, tags: [], editingId: null, dishNotes: {}, newDishes: [], photos: [] };
     $('#step-pick').hidden = false;
     $('#step-newplace').hidden = true;
     $('#step-rate').hidden = true;
@@ -270,8 +310,6 @@
       id: 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
       name,
       category: $('#np-cat').value.trim(),
-      amount: Number($('#np-amount').value) || 0,      // 花费
-      people: Number($('#np-people').value) || 0,      // 人数
       address: $('#np-addr').value.trim(),
       createdAt: new Date().toISOString()
     }, null, true);
@@ -290,13 +328,25 @@
       scores: {},
       tags: [],
       editingId: existing ? existing.id : null,
-      dishes: [],
+      dishNotes: {},
+      newDishes: [],
       photos: []
     };
     if (existing) {
       DIMS.forEach(d => { UI.draft.scores[d.key] = existing[d.key] || 0; });
       UI.draft.tags = (existing.tags || []).slice();
-      UI.draft.dishes = (existing.dishes || []).map(x => ({ name: x.name || '', price: x.price || '' }));
+      // 老数据兼容：菜品曾记在各自的 rating.dishes 里 → 转成本次「新菜」，提交时并入店铺菜单
+      (existing.dishes || []).forEach(x => {
+        if (x && x.name) {
+          UI.draft.newDishes.push({
+            id: 'd_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+            name: x.name,
+            price: Number(x.price) || 0,
+            by: Store.myNick()
+          });
+        }
+      });
+      UI.draft.dishNotes = Object.assign({}, existing.dishNotes || {});
       $('#r-comment').value = existing.comment || '';
       $('#r-date').value = existing.visitedAt || today();
       $('#r-bill').value = existing.bill || '';
@@ -376,10 +426,33 @@
     });
   }
 
+  /** 预设标签 + 全员共享的自定义标签 */
+  function allTags() {
+    const set = new Set(TAGS);
+    (Store.tags || []).forEach(t => set.add(t));
+    return Array.from(set);
+  }
+
   function renderTagChips() {
-    $('#tag-chips').innerHTML = TAGS.map(t =>
-      `<button class="chip${UI.draft.tags.includes(t) ? ' on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('');
-    $$('#tag-chips .chip').forEach(c => c.addEventListener('click', () => {
+    $('#tag-chips').innerHTML = allTags().map(t =>
+      `<button class="chip${UI.draft.tags.includes(t) ? ' on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')
+      + '<button class="chip chip-add" data-add="1">＋ 自定义</button>';
+
+    $$('#tag-chips .chip').forEach(c => c.addEventListener('click', async () => {
+      if (c.dataset.add) {
+        const raw = prompt('新标签（最多 12 字，所有人共享）');
+        const t = String(raw || '').trim().replace(/\s+/g, ' ').slice(0, 12);
+        if (!t) return;
+        try {
+          await Store.addTag(t);
+          if (!UI.draft.tags.includes(t)) UI.draft.tags.push(t);   // 顺手选中
+          renderTagChips();
+          toast('标签已加，大家都能用');
+        } catch (e) {
+          toast('标签没存上：' + e.message, 3000);
+        }
+        return;
+      }
       const t = c.dataset.tag;
       const i = UI.draft.tags.indexOf(t);
       if (i >= 0) UI.draft.tags.splice(i, 1); else UI.draft.tags.push(t);
@@ -387,39 +460,70 @@
     }));
   }
 
-  /* ================= 菜品清单 ================= */
+  /* ================= 共享菜单 + 逐道评价 ================= */
+  function currentMenu() {
+    const p = UI.draft.place;
+    const shared = (p && p.id && !UI.draft.placeIsNew) ? Store.dishesOf(p.id) : [];
+    return shared.concat(UI.draft.newDishes);
+  }
+
   function renderDishes() {
     const box = $('#dish-list');
-    if (!UI.draft.dishes.length) UI.draft.dishes.push({ name: '', price: '' });
+    if (!UI.draft.place) { box.innerHTML = ''; $('#menu-note').textContent = ''; return; }
 
-    box.innerHTML = UI.draft.dishes.map((d, i) =>
-      `<div class="dish-row" data-i="${i}">
-        <input type="text" class="dish-name" placeholder="菜名" value="${esc(d.name)}">
-        <input type="number" class="dish-price" placeholder="价格" inputmode="decimal" value="${esc(d.price)}">
-        <button class="dish-del" title="删掉">✕</button>
-      </div>`).join('');
+    const all = currentMenu();
+    $('#menu-note').textContent = all.length ? `共 ${all.length} 道，吃过的写两句` : '还没菜单，先加几道';
 
-    $$('#dish-list .dish-row').forEach(row => {
-      const i = Number(row.dataset.i);
-      // 输入时不重绘，否则会丢焦点
-      $('.dish-name', row).addEventListener('input', e => { UI.draft.dishes[i].name = e.target.value; });
-      $('.dish-price', row).addEventListener('input', e => {
-        UI.draft.dishes[i].price = e.target.value;
-        updateBillHint();
-      });
-      $('.dish-del', row).addEventListener('click', () => {
-        UI.draft.dishes.splice(i, 1);
-        renderDishes();
-        updateBillHint();
+    if (!all.length) {
+      box.innerHTML = '<p class="dish-empty">把吃到的菜加进来，以后大家都能看到</p>';
+      return;
+    }
+
+    box.innerHTML = all.map(d => {
+      const note = UI.draft.dishNotes[d.id] || '';
+      const by = (d.by && d.by !== Store.myNick()) ? `<span class="dish-by">${esc(d.by)} 加的</span>` : '';
+      return `<div class="dish-block" data-id="${esc(d.id)}">
+        <div class="dish-head">
+          <span class="dish-name">${esc(d.name)}</span>
+          ${d.price ? `<span class="dish-price">¥${d.price}</span>` : ''}
+          ${by}
+        </div>
+        <input type="text" class="dish-note" placeholder="这道菜怎么样（选填）" value="${esc(note)}">
+      </div>`;
+    }).join('');
+
+    // 输入时不重绘，否则会丢焦点
+    $$('#dish-list .dish-block').forEach(blk => {
+      const id = blk.dataset.id;
+      $('.dish-note', blk).addEventListener('input', e => {
+        UI.draft.dishNotes[id] = e.target.value;
       });
     });
     updateBillHint();
   }
 
+  function addNewDish() {
+    if (!UI.draft.place) return toast('先选一家店');
+    const name = $('#new-dish-name').value.trim();
+    if (!name) return toast('菜名呢');
+    const price = Number($('#new-dish-price').value) || 0;
+
+    if (currentMenu().some(x => x.name === name)) return toast('菜单里已经有这道了');
+
+    UI.draft.newDishes.push({
+      id: 'd_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      name, price, by: Store.myNick()
+    });
+    $('#new-dish-name').value = '';
+    $('#new-dish-price').value = '';
+    $('#new-dish-name').focus();
+    renderDishes();
+  }
+
   function updateBillHint() {
     const bill = Number($('#r-bill').value) || 0;
     const people = Number($('#r-people').value) || 0;
-    const dishSum = UI.draft.dishes.reduce((s, d) => s + (Number(d.price) || 0), 0);
+    const dishSum = currentMenu().reduce((s, d) => s + (Number(d.price) || 0), 0);
     const parts = [];
     if (bill) parts.push(people ? `${people} 人 · 合计 ¥${bill}` : `合计 ¥${bill}`);
     if (dishSum) parts.push(`菜品合计 ¥${dishSum}`);
@@ -504,9 +608,9 @@
     $('#lightbox-img').src = '';
   });
 
-  $('#btn-add-dish').addEventListener('click', () => {
-    UI.draft.dishes.push({ name: '', price: '' });
-    renderDishes();
+  $('#btn-add-dish').addEventListener('click', addNewDish);
+  $('#new-dish-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addNewDish(); }
   });
   $('#btn-add-photo').addEventListener('click', () => $('#photo-input').click());
   $('#photo-input').addEventListener('change', async e => {
@@ -526,10 +630,15 @@
     btn.disabled = true; btn.textContent = '提交中…';
     try {
       const d = UI.draft;
+
+      // 1) 菜单：新店整包建，老店只把新加的菜并进去（按 id 合并，不会覆盖别人的菜）
       if (d.placeIsNew) {
+        d.place.dishes = d.newDishes.slice();
         await Store.addPlace(d.place);
         $('#add-tip').className = 'tip ok';
         $('#add-tip').textContent = `新店「${d.place.name}」已创建`;
+      } else if (d.newDishes.length) {
+        await Store.addDishes(d.place.id, d.newDishes);
       }
       const ratings = Store.myRatings().slice();
       const rec = {
@@ -543,9 +652,14 @@
       };
       DIMS.forEach(x => { rec[x.key] = Number(s[x.key]) || 0; });
 
-      rec.dishes = d.dishes
-        .filter(x => String(x.name || '').trim())
-        .map(x => ({ name: String(x.name).trim(), price: Number(x.price) || 0 }));
+      // 逐道菜的文字评价：只存写了字的
+      const notes = {};
+      Object.entries(d.dishNotes || {}).forEach(([k, v]) => {
+        const txt = String(v || '').trim();
+        if (txt) notes[k] = txt;
+      });
+      rec.dishNotes = notes;
+
       rec.bill = Number($('#r-bill').value) || 0;
       rec.people = Number($('#r-people').value) || 0;
       rec.photos = d.photos.map(p => ({ id: p.id }));

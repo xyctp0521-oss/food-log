@@ -268,16 +268,37 @@ textarea{resize:none;line-height:1.6}
 .me-info span{font-size:11px;color:var(--ink-2)}
 .me-row .btn-ghost{margin-left:auto;padding:8px 14px;font-size:13px;flex:0 0 auto}
 
-/* ---------- 菜品清单 ---------- */
-.dish-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
-.dish-row input{margin-bottom:0}
-.dish-row .dish-name{flex:2.2;min-width:0}
-.dish-row .dish-price{flex:1;min-width:0}
-.dish-del{
-  flex:0 0 auto;width:30px;height:38px;border-radius:9px;border:1px solid var(--line);
-  background:#fff;color:var(--ink-2);font-size:16px;cursor:pointer;line-height:1;padding:0;
+/* ---------- 共享菜单 ---------- */
+.lbl-note{font-size:11px;font-weight:500;color:var(--ink-2);margin-left:5px}
+.dish-block{
+  background:#fff;border:1px solid var(--line);border-radius:11px;
+  padding:10px 12px;margin-bottom:7px;
 }
-.dish-del:active{background:#FDECEA;color:var(--bad)}
+.dish-head{display:flex;align-items:baseline;gap:7px;margin-bottom:6px}
+.dish-name{font-size:14px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dish-price{font-size:12px;color:var(--ink-2);font-weight:600;flex:0 0 auto}
+.dish-by{font-size:10px;color:#B8ADA4;flex:0 0 auto}
+.dish-note{
+  width:100%;padding:8px 10px;font-size:13px;border-radius:9px;
+  border:1px solid var(--line);background:#FFFDFB;outline:none;
+}
+.dish-note:focus{border-color:var(--brand)}
+.dish-add-row{display:flex;gap:6px;align-items:center}
+.dish-add-row input{margin-bottom:0}
+.dish-add-row #new-dish-name{flex:2.2;min-width:0}
+.dish-add-row #new-dish-price{flex:1;min-width:0}
+.dish-add-row .btn-ghost{flex:0 0 auto;padding:12px 20px}
+.dish-empty{font-size:12px;color:var(--ink-2);padding:2px 0 10px}
+/* 详情页：菜品上的各人点评 */
+.dish-review{font-size:12px;margin-top:5px;line-height:1.6}
+.dish-review b{color:var(--brand-deep);margin-right:4px;font-weight:700}
+.menu-item{padding:9px 0;border-bottom:1px dashed var(--line)}
+.menu-item:last-child{border-bottom:0;padding-bottom:2px}
+.menu-row{display:flex;align-items:baseline;gap:8px}
+.mn{font-size:14px;font-weight:700;flex:1;min-width:0}
+.mp{font-size:12px;color:var(--ink-2);font-weight:600;flex:0 0 auto}
+.chip-add{border-style:dashed;color:var(--brand)}
+.chip-add:active{background:var(--brand-soft)}
 
 /* ---------- 照片 ---------- */
 .photo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}

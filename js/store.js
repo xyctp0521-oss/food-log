@@ -10,11 +10,15 @@
     places: 'foodlog:places',
     users: 'foodlog:users',
     pending: 'foodlog:pending',
+    tags: 'foodlog:tags',
     syncedAt: 'foodlog:syncedAt'
   };
 
   const PLACES_PATH = 'data/places.json';
   const USERS_DIR = 'data/users';
+  const TAGS_PATH = 'data/tags.json';
+
+  const uniq = arr => Array.from(new Set((arr || []).filter(Boolean)));
 
   /* ---------- 工具 ---------- */
   function readLS(key, def) {
@@ -111,12 +115,14 @@
     client: null,
     places: [],
     userFiles: {},   // { fileName: { nick, ratings:[] } }
+    tags: [],        // 全员共享的自定义标签
     pending: [],
     lastSync: 0,
 
     init() {
       this.places = readLS(K.places, []);
       this.userFiles = readLS(K.users, {});
+      this.tags = readLS(K.tags, []);
       this.pending = readLS(K.pending, []);
       this.lastSync = readLS(K.syncedAt, 0);
       const cfg = this.cfg();
@@ -137,6 +143,7 @@
     _persist() {
       writeLS(K.places, this.places);
       writeLS(K.users, this.userFiles);
+      writeLS(K.tags, this.tags);
       writeLS(K.pending, this.pending);
     },
 
@@ -145,13 +152,17 @@
       if (!this.client || !this.client.ready) return { ok: false, reason: '未配置' };
       const t0 = Date.now();
 
-      const [placesFile, dir] = await Promise.all([
+      const [placesFile, dir, tagsFile] = await Promise.all([
         this.client.getFile(PLACES_PATH),
-        this.client.listDir(USERS_DIR)
+        this.client.listDir(USERS_DIR),
+        this.client.getFile(TAGS_PATH).catch(() => null)
       ]);
 
       if (placesFile && Array.isArray(placesFile.data && placesFile.data.places)) {
         this.places = mergePlaces(this.places, placesFile.data.places);
+      }
+      if (tagsFile && Array.isArray(tagsFile.data && tagsFile.data.tags)) {
+        this.tags = uniq(this.tags.concat(tagsFile.data.tags));
       }
 
       const files = dir.filter(f => f.type === 'file' && /^u_.*\.json$/.test(f.name));
@@ -217,6 +228,14 @@
         if (!blob) return;                      // 本地也找不到，只能放弃
         const b64 = bufToB64(await blob.arrayBuffer());
         await this.client.putBase64(`data/photos/${op.photoId}.jpg`, b64, `照片 ${op.photoId}`);
+      } else if (op.type === 'tag') {
+        await this.client.putFile(
+          TAGS_PATH,
+          { v: 1, tags: op.tags || [] },
+          `新增标签：${op.tag}`,
+          (remote, local) => ({ v: 1, tags: uniq((remote.tags || []).concat(local.tags || [])) })
+        );
+        this.tags = uniq(this.tags.concat(op.tags || []));
       }
       this._persist();
     },
@@ -237,6 +256,32 @@
       }
     },
 
+    /** 往已有店铺的共享菜单里加菜（按菜名去重，按 id 合并） */
+    async addDishes(placeId, dishes) {
+      const p = this.placeById(placeId);
+      if (!p) throw new Error('店铺不存在');
+
+      const exist = new Set((p.dishes || []).map(x => x.name));
+      const fresh = (dishes || []).filter(d => d && d.name && !exist.has(d.name));
+      if (!fresh.length) return { ok: true, added: 0 };
+
+      const updated = Object.assign({}, p, {
+        dishes: mergeDishes(p.dishes || [], fresh),
+        updatedAt: nowISO()
+      });
+      this.places = mergePlaces(this.places, [updated]);
+      this._persist();
+
+      if (!this.ready) { queuePlace(this, updated); return { queued: true, added: fresh.length }; }
+      try {
+        await this._runOp({ type: 'place', place: updated });
+        return { ok: true, added: fresh.length };
+      } catch (e) {
+        queuePlace(this, updated);
+        throw e;
+      }
+    },
+
     async saveMyRatings(ratings) {
       const nick = this.myNick();
       const fileName = `u_${nickHash(nick)}.json`;
@@ -248,6 +293,25 @@
         return { ok: true };
       } catch (e) {
         queueRatings(this, nick, ratings);
+        throw e;
+      }
+    },
+
+    /** 新增全员共享标签 */
+    async addTag(tag) {
+      const t = String(tag || '').trim().replace(/\s+/g, ' ').slice(0, 12);
+      if (!t) return { ok: false };
+      if (this.tags.includes(t)) return { ok: true, existed: true };
+
+      this.tags = uniq(this.tags.concat([t]));
+      this._persist();
+
+      if (!this.ready) { queueTag(this, t); return { queued: true }; }
+      try {
+        await this._runOp({ type: 'tag', tag: t, tags: this.tags });
+        return { ok: true };
+      } catch (e) {
+        queueTag(this, t);
         throw e;
       }
     },
@@ -312,17 +376,35 @@
       return out.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
     },
     placeById(id) { return this.places.find(p => p.id === id) || null; },
+    /** 该店的共享菜单 */
+    dishesOf(placeId) {
+      const p = this.placeById(placeId);
+      return (p && Array.isArray(p.dishes)) ? p.dishes.slice() : [];
+    },
+    /** 旧数据兼容：菜品曾被记在各自 rating.dishes 里 */
+    legacyDishesOf(placeId) {
+      const out = [];
+      Object.values(this.userFiles).forEach(f => {
+        (f.ratings || []).forEach(r => {
+          if (r.placeId === placeId && Array.isArray(r.dishes)) {
+            r.dishes.forEach(d => { if (d && d.name) out.push({ name: d.name, price: d.price }); });
+          }
+        });
+      });
+      return out;
+    },
     categories() {
       return Array.from(new Set(this.places.map(p => p.category).filter(Boolean))).sort();
     },
 
     /* ---------- 备份 ---------- */
     exportAll() {
-      return { v: 1, exportedAt: nowISO(), places: this.places, userFiles: this.userFiles };
+      return { v: 1, exportedAt: nowISO(), places: this.places, userFiles: this.userFiles, tags: this.tags };
     },
     importAll(obj) {
       if (!obj || !Array.isArray(obj.places)) throw new Error('文件格式不对');
       this.places = mergePlaces(this.places, obj.places);
+      if (Array.isArray(obj.tags)) this.tags = uniq(this.tags.concat(obj.tags));
       if (obj.userFiles) {
         Object.entries(obj.userFiles).forEach(([k, v]) => {
           const prev = this.userFiles[k];
@@ -337,16 +419,37 @@
   };
 
   /* ---------- 合并逻辑：按 id 去重，取更新时间更晚的 ---------- */
+  /** 菜单按菜品 id 并集：谁加的菜都不会被别人的提交冲掉 */
+  function mergeDishes(a, b) {
+    const map = new Map();
+    (a || []).forEach(d => { if (d && d.id) map.set(d.id, d); });
+    (b || []).forEach(d => { if (d && d.id) map.set(d.id, d); });
+    return Array.from(map.values());
+  }
+
   function mergePlaces(local, remote) {
     const map = new Map();
-    (local || []).forEach(p => p && p.id && map.set(p.id, p));
-    (remote || []).forEach(p => {
+    const ts = x => String(x.updatedAt || x.createdAt || '');
+
+    const put = (p) => {
       if (!p || !p.id) return;
       const cur = map.get(p.id);
-      if (!cur || String(p.updatedAt || p.createdAt || '') >= String(cur.updatedAt || cur.createdAt || '')) {
-        map.set(p.id, p);
-      }
-    });
+      if (!cur) { map.set(p.id, p); return; }
+
+      const newer = ts(p) >= ts(cur) ? p : cur;
+      const older = newer === p ? cur : p;
+      const merged = Object.assign({}, newer);
+
+      // 店铺字段取较新的，但菜单必须并集，否则后提交的人会覆盖先加的菜
+      const d1 = older.dishes || [];
+      const d2 = newer.dishes || [];
+      if (d1.length || d2.length) merged.dishes = mergeDishes(d1, d2);
+
+      map.set(p.id, merged);
+    };
+
+    (local || []).forEach(put);
+    (remote || []).forEach(put);
     return Array.from(map.values());
   }
 
@@ -385,6 +488,11 @@
   function queuePhoto(store, photoId) {
     store.pending = store.pending.filter(o => !(o.type === 'photo' && o.photoId === photoId));
     store.pending.push({ type: 'photo', photoId });
+    store._persist();
+  }
+  function queueTag(store, tag) {
+    store.pending = store.pending.filter(o => !(o.type === 'tag' && o.tag === tag));
+    store.pending.push({ type: 'tag', tag, tags: store.tags });
     store._persist();
   }
 

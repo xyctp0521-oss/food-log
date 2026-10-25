@@ -10,7 +10,7 @@
 <title>探店日记 · 小伙伴的美食账本</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css?v=9">
+<link rel="stylesheet" href="css/style.css?v=10">
 </head>
 <body>
 
@@ -83,10 +83,6 @@
       <input type="text" id="np-name" placeholder="店名 *">
       <input type="text" id="np-cat" placeholder="品类（如 湘菜）" list="cat-list">
       <datalist id="cat-list"></datalist>
-      <div class="row2">
-        <input type="number" id="np-amount" placeholder="花费（元）" inputmode="decimal">
-        <input type="number" id="np-people" placeholder="人数" inputmode="numeric">
-      </div>
       <input type="text" id="np-addr" placeholder="地址（选填）">
       <div class="row2">
         <button class="btn-ghost" id="btn-np-cancel">取消</button>
@@ -101,9 +97,13 @@
       <div class="dim-block" id="dim-block"></div>
       <p class="hint" style="margin-top:8px">每项 10 颗星，拖动可打小数（如 8.3）。没把握的项可以不打。</p>
 
-      <label class="lbl">本次吃了什么</label>
+      <label class="lbl">菜单 <span class="lbl-note" id="menu-note"></span></label>
       <div id="dish-list"></div>
-      <button class="btn-ghost full" id="btn-add-dish">＋ 加一道菜</button>
+      <div class="dish-add-row">
+        <input type="text" id="new-dish-name" placeholder="菜名，加进这家店的菜单">
+        <input type="number" id="new-dish-price" placeholder="价格" inputmode="decimal">
+        <button class="btn-ghost" id="btn-add-dish">加</button>
+      </div>
 
       <label class="lbl">账单</label>
       <div class="row2" style="margin-top:0">
@@ -189,7 +189,7 @@
         <p>· 数据存在你自己的 GitHub 仓库里，不经过任何第三方服务器。</p>
         <p>· 没信号时照常记录，联网后会自动补交。</p>
         <p>· 令牌只保存在这台设备上，换设备要重新填。</p>
-        <p style="margin-top:10px;opacity:.55;font-size:11px">版本 v9 · 看到版本号不是 v9 说明还是旧缓存</p>
+        <p style="margin-top:10px;opacity:.55;font-size:11px">版本 v10 · 看到版本号不是 v10 说明还是旧缓存</p>
       </div>
     </div>
   </section>
@@ -212,8 +212,8 @@
 
 <div class="lightbox" id="lightbox" hidden><img id="lightbox-img" alt=""></div>
 
-<script src="js/remote.js?v=9"></script>
-<script src="js/store.js?v=9"></script>
-<script src="js/app.js?v=9"></script>
+<script src="js/remote.js?v=10"></script>
+<script src="js/store.js?v=10"></script>
+<script src="js/app.js?v=10"></script>
 </body>
 </html>
