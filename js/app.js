@@ -819,14 +819,18 @@
 
       // 自动套用内置同步配置（同一密码解封）；解不开就保底走手动填写
       let autoCfg = false;
+      let autoErr = '';
       try {
         const cfg = await unsealCfg(pwd);
         if (cfg && cfg.owner && cfg.repo && cfg.token) {
           Store.saveCfg(cfg);
           autoCfg = true;
+        } else {
+          autoErr = '解出来的配置不完整';
         }
       } catch (e) {
-        console.warn('内置同步配置解封失败：', e.message);
+        autoErr = e.message || String(e);
+        console.warn('内置同步配置解封失败：', autoErr);
       }
 
       hideLogin();
@@ -838,8 +842,9 @@
         toast(`欢迎，${pickedAccount}`);
         doSync(true);
       } else {
-        toast(`欢迎，${pickedAccount}（同步还没配好）`, 2600);
+        toast(`欢迎，${pickedAccount}`, 1500);
         go('page-set');
+        if (autoErr) setTimeout(() => toast('自动配置失败：' + autoErr, 4200), 900);
       }
     } catch (e) {
       $('#login-err').textContent = '登录失败：' + e.message;

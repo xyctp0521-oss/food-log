@@ -1,14 +1,14 @@
 /* Service Worker：只缓存本站静态资源，保证没信号时也能打开记账
  * GitHub API 属跨域请求，不拦截，始终走网络
  */
-const CACHE = 'foodlog-v8';
+const CACHE = 'foodlog-v9';
 const ASSETS = [
   './',
   './index.html',
-  './css/style.css',
-  './js/remote.js',
-  './js/store.js',
-  './js/app.js',
+  './css/style.css?v=9',
+  './js/remote.js?v=9',
+  './js/store.js?v=9',
+  './js/app.js?v=9',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png'
