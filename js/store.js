@@ -27,6 +27,15 @@
     try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.warn('缓存写入失败', e); }
   }
 
+  /* ---------- 登录会话（首次登录后长期记住） ---------- */
+  const SESSION_KEY = 'foodlog:session';
+  function sessionNick() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+      return s && s.nick ? String(s.nick) : '';
+    } catch (e) { return ''; }
+  }
+
   /** 昵称 → 稳定的 8 位文件名后缀（避免中文路径，也避免重名撞车） */
   function nickHash(nick) {
     let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
@@ -69,7 +78,7 @@
       this.client = new GitHubClient(merged);
       return merged;
     },
-    get ready() { return this.client && this.client.ready && !!this.cfg().nick; },
+    get ready() { return this.client && this.client.ready && !!this.myNick(); },
 
     /* ---------- 本地缓存 ---------- */
     _persist() {
@@ -171,7 +180,7 @@
     },
 
     async saveMyRatings(ratings) {
-      const nick = this.cfg().nick;
+      const nick = this.myNick();
       const fileName = `u_${nickHash(nick)}.json`;
       this.userFiles[fileName] = { nick, ratings };
       this._persist();
@@ -186,7 +195,9 @@
     },
 
     /* ---------- 查询 ---------- */
-    myNick() { return this.cfg().nick; },
+    myNick() { return sessionNick(); },
+    setSession(nick) { writeLS(SESSION_KEY, { nick, at: Date.now() }); },
+    clearSession() { try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ } },
     myRatings() {
       const nick = this.myNick();
       const f = this.userFiles[`u_${nickHash(nick)}.json`];

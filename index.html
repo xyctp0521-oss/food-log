@@ -14,6 +14,25 @@
 </head>
 <body>
 
+<!-- ================= 登录 ================= -->
+<div class="login" id="login">
+  <div class="login-box">
+    <div class="login-logo">🍜</div>
+    <h1 class="login-title">探店簿</h1>
+    <p class="login-sub" id="login-sub">选一个身份进入</p>
+
+    <div class="accounts" id="accounts"></div>
+
+    <div class="login-form" id="login-form" hidden>
+      <input type="password" id="pwd" placeholder="初始密码" inputmode="numeric" autocomplete="current-password">
+      <button class="btn-main" id="btn-login">进入</button>
+      <p class="login-err" id="login-err"></p>
+    </div>
+
+    <p class="login-tip">首次登录后本机会记住你，以后直接进</p>
+  </div>
+</div>
+
 <div id="app">
   <!-- ================= 榜单页 ================= -->
   <section class="page" id="page-rank">
@@ -116,9 +135,15 @@
     <header class="topbar"><div><h1 class="brand">设置</h1><p class="sub">同步配置</p></div></header>
 
     <div class="card">
-      <label class="lbl">你的昵称</label>
-      <input type="text" id="set-nick" placeholder="比如 小羊">
-      <p class="hint">朋友们各自填自己的昵称，数据按昵称分开存，互不覆盖。</p>
+      <label class="lbl">当前账号</label>
+      <div class="me-row">
+        <div class="avatar" id="set-avatar">?</div>
+        <div class="me-info">
+          <b id="set-nickname">-</b>
+          <span>本机已记住，无需再输密码</span>
+        </div>
+        <button class="btn-ghost" id="btn-logout">切换</button>
+      </div>
     </div>
 
     <div class="card">

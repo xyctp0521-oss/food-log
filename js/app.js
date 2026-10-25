@@ -227,8 +227,8 @@
 
   function startRate(place, existing, isNew) {
     if (!Store.myNick()) {
-      toast('先去设置里填个昵称');
-      return go('page-set');
+      toast('请先登录账号');
+      return showLogin();
     }
     go('page-add');   // 内部 resetAdd() 会清空草稿，必须先切页再写值
 
@@ -376,32 +376,34 @@
   /* ================= 设置 ================= */
   function loadSet() {
     const c = Store.cfg();
-    $('#set-nick').value = c.nick || '';
+    const nick = Store.myNick();
+    const av = $('#set-avatar');
+    av.textContent = nick ? nick.slice(0, 1) : '?';
+    av.style.background = nick ? avatarColor(nick) : '#D9CFC7';
+    $('#set-nickname').textContent = nick || '未登录';
     $('#set-owner').value = c.owner || '';
     $('#set-repo').value = c.repo || '';
     $('#set-token').value = c.token || '';
-    $('#set-branch').value = c.branch || 'master';
+    $('#set-branch').value = c.branch || 'main';
     renderSyncState();
   }
   function renderSyncState() {
-    const c = Store.cfg();
+    const nick = Store.myNick();
     const n = Store.pending.length;
     const t = Store.lastSync ? new Date(Store.lastSync).toLocaleString('zh-CN') : '从未';
-    $('#sync-state').textContent = `上次同步：${t}` + (n ? ` · ${n} 条待补交` : '') + (c.nick ? ` · 身份：${c.nick}` : ' · 未设置昵称');
+    $('#sync-state').textContent = `上次同步：${t}` + (n ? ` · ${n} 条待补交` : '') + (nick ? ` · 身份：${nick}` : '');
   }
 
   $('#btn-save-set').addEventListener('click', async () => {
-    const nick = $('#set-nick').value.trim();
-    if (!nick) return toast('昵称必须填');
+    if (!Store.myNick()) return toast('请先登录账号');
     Store.saveCfg({
-      nick,
       owner: $('#set-owner').value.trim(),
       repo: $('#set-repo').value.trim(),
       token: $('#set-token').value.trim(),
-      branch: $('#set-branch').value.trim() || 'master'
+      branch: $('#set-branch').value.trim() || 'main'
     });
     toast('已保存');
-    renderSyncState();
+    loadSet();
     if (Store.ready) await doSync();
   });
 
@@ -473,17 +475,110 @@
   }
   $('#btn-sync').addEventListener('click', () => doSync(false));
 
+  /* ================= 登录（固定 4 个账号） ================= */
+  const ACCOUNTS = ['小羊', '小陈', '小皓', '小何'];
+  const PWD_SALT = 'food-log-salt-2026';
+  const PWD_ITER = 100000;
+  // PBKDF2-SHA256(21032602, salt) —— 代码是公开的，只存哈希不存明文
+  const PWD_HASH = '10cef5f61e7ffa09a9bcfbdc4a09bcaf9f5ea57debc54672b4dd8f2efee56901';
+
+  let pickedAccount = '';
+
+  async function hashPwd(pwd) {
+    const enc = new TextEncoder();
+    const keyMat = await crypto.subtle.importKey('raw', enc.encode(pwd), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt: enc.encode(PWD_SALT), iterations: PWD_ITER, hash: 'SHA-256' },
+      keyMat, 256
+    );
+    return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function initLogin() {
+    $('#accounts').innerHTML = ACCOUNTS.map(n =>
+      `<button class="acc" data-nick="${esc(n)}">
+        <div class="avatar" style="background:${avatarColor(n)}">${esc(n.slice(0, 1))}</div>
+        <div class="nm">${esc(n)}</div>
+      </button>`).join('');
+
+    $$('#accounts .acc').forEach(b => b.addEventListener('click', () => {
+      pickedAccount = b.dataset.nick;
+      $$('#accounts .acc').forEach(x => x.classList.toggle('on', x === b));
+      $('#login-form').hidden = false;
+      $('#login-err').textContent = '';
+      $('#pwd').value = '';
+      $('#pwd').focus();
+    }));
+
+    $('#btn-login').addEventListener('click', doLogin);
+    $('#pwd').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  }
+
+  async function doLogin() {
+    if (!pickedAccount) return;
+    if (!(window.crypto && window.crypto.subtle)) {
+      $('#login-err').textContent = '当前环境不支持安全校验，请用 https 打开';
+      return;
+    }
+    const pwd = $('#pwd').value;
+    if (!pwd) { $('#login-err').textContent = '请输入密码'; return; }
+
+    const btn = $('#btn-login');
+    btn.disabled = true; btn.textContent = '验证中…';
+    try {
+      const h = await hashPwd(pwd);
+      if (h !== PWD_HASH) {
+        $('#login-err').textContent = '密码不对';
+        $('#pwd').value = '';
+        $('#pwd').focus();
+        return;
+      }
+      Store.setSession(pickedAccount);
+      hideLogin();
+      loadSet();
+      renderRank();
+      renderMe();
+      toast(`欢迎，${pickedAccount}`);
+      if (Store.ready) doSync(true);
+      else { go('page-set'); toast('还差 GitHub 仓库配置', 2600); }
+    } catch (e) {
+      $('#login-err').textContent = '登录失败：' + e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = '进入';
+    }
+  }
+
+  function showLogin() {
+    pickedAccount = '';
+    $$('#accounts .acc').forEach(x => x.classList.remove('on'));
+    $('#login-form').hidden = true;
+    $('#pwd').value = '';
+    $('#login-err').textContent = '';
+    $('#login').hidden = false;
+  }
+  function hideLogin() { $('#login').hidden = true; }
+
+  $('#btn-logout').addEventListener('click', () => {
+    if (!confirm('切换账号？本机缓存的数据不会丢。')) return;
+    Store.clearSession();
+    showLogin();
+    go('page-set');
+  });
+
   /* ================= 启动 ================= */
   function boot() {
     Store.init();
+    initLogin();
     loadSet();
     renderRank();
-    if (!Store.myNick()) {
-      go('page-set');
-      toast('先填昵称和 GitHub 仓库配置，就能开用了');
+
+    if (Store.myNick()) {
+      hideLogin();
+      if (Store.ready) doSync(true);
     } else {
-      doSync(true);
+      showLogin();
     }
+
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(() => { /* 本地 http 下可忽略 */ });
     }

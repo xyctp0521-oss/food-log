@@ -217,3 +217,39 @@ textarea{resize:none;line-height:1.6}
 .about p{font-size:13px;color:var(--ink-2);line-height:1.9}
 .sheet .btn-main{width:100%;margin-top:14px}
 .mb8{margin-bottom:8px}
+
+/* ---------- 登录页 ---------- */
+.login{
+  position:fixed;inset:0;z-index:200;
+  background:linear-gradient(170deg,#FFF6F0 0%,#FFFBF7 45%,#FFF3EA 100%);
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;overflow-y:auto;
+}
+.login[hidden]{display:none}
+.login-box{width:100%;max-width:330px;text-align:center}
+.login-logo{font-size:46px;line-height:1;margin-bottom:8px}
+.login-title{font-size:26px;font-weight:800;letter-spacing:-.5px}
+.login-sub{color:var(--ink-2);font-size:13px;margin:8px 0 20px}
+.accounts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.acc{
+  background:var(--card);border:2px solid var(--line);border-radius:14px;
+  padding:14px 8px;cursor:pointer;transition:border-color .15s,background .15s;
+  display:flex;flex-direction:column;align-items:center;gap:7px;
+}
+.acc:active{transform:scale(.97)}
+.acc.on{border-color:var(--brand);background:var(--brand-soft)}
+.acc .avatar{width:38px;height:38px;font-size:16px}
+.acc .nm{font-size:14px;font-weight:700}
+.login-form[hidden]{display:none}
+.login-form input{text-align:center;letter-spacing:3px;font-size:17px}
+.login-form .btn-main{width:100%;margin-top:10px}
+.login-err{font-size:12px;color:var(--bad);min-height:18px;margin-top:8px}
+.login-tip{font-size:11px;color:var(--ink-2);margin-top:14px;opacity:.8}
+
+/* ---------- 设置页账号行 ---------- */
+.me-row{display:flex;align-items:center;gap:11px}
+.me-row .avatar{width:38px;height:38px;font-size:15px}
+.me-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.me-info b{font-size:16px}
+.me-info span{font-size:11px;color:var(--ink-2)}
+.me-row .btn-ghost{margin-left:auto;padding:8px 14px;font-size:13px;flex:0 0 auto}

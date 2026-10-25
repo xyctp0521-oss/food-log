@@ -28,10 +28,13 @@ check('中文昵称稳定', nickHash('小羊') === nickHash('小羊'));
 check('不同昵称不同', nickHash('小羊') !== nickHash('小陈'));
 check('8位hex', /^[0-9a-f]{8}$/.test(nickHash('小羊')));
 
-console.log('[2] 未配置 GitHub 时 = 离线模式');
+console.log('[2] 登录会话 + 未配置仓库 = 离线模式');
 Store.init();
-Store.saveCfg({ nick: '小羊', owner: '', repo: '', token: '' });
-check('ready=false', Store.ready === false);
+check('未登录时 myNick 为空', Store.myNick() === '');
+Store.setSession('小羊');
+check('登录后 myNick = 小羊', Store.myNick() === '小羊');
+Store.saveCfg({ owner: '', repo: '', token: '' });
+check('无仓库配置 ready=false', Store.ready === false);
 
 (async () => {
   console.log('[3] 离线添加店铺与评分 → 进 pending 队列');
