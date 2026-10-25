@@ -560,9 +560,14 @@
       for (const p of d.photos) {
         try { await Store.uploadPhoto(p.id); } catch (e) { photoFail++; }
       }
-      $('#add-tip').className = 'tip ok';
-      $('#add-tip').textContent = res.queued ? '已存本地，联网后自动补交' : '提交成功';
+      const notReady = !Store.ready;   // 是「压根没配同步」，不是网络问题
+      $('#add-tip').className = notReady ? 'tip err' : 'tip ok';
+      $('#add-tip').textContent = notReady
+        ? '同步没配好，数据只存在本机'
+        : (res.queued ? '已存本地，联网后自动补交' : '提交成功');
+
       if (photoFail) toast(`${photoFail} 张照片没传上去，联网后自动补`, 2800);
+      else if (notReady) toast('同步没配好，数据只存在本机', 3000);
       else toast(res.queued ? '离线保存了，联网后再传' : '记下了 ✓');
       setTimeout(() => { resetAdd(); go('page-rank'); }, 900);
     } catch (e) {
@@ -638,7 +643,15 @@
     const nick = Store.myNick();
     const n = Store.pending.length;
     const t = Store.lastSync ? new Date(Store.lastSync).toLocaleString('zh-CN') : '从未';
-    $('#sync-state').textContent = `上次同步：${t}` + (n ? ` · ${n} 条待补交` : '') + (nick ? ` · 身份：${nick}` : '');
+    const el = $('#sync-state');
+
+    if (!Store.ready) {
+      el.style.color = 'var(--bad)';
+      el.textContent = '⚠️ 同步未配置，数据只存在本机' + (n ? `（${n} 条待上传）` : '');
+      return;
+    }
+    el.style.color = '';
+    el.textContent = `上次同步：${t}` + (n ? ` · ${n} 条待补交` : '') + (nick ? ` · 身份：${nick}` : '');
   }
 
   $('#btn-save-set').addEventListener('click', async () => {
@@ -859,9 +872,17 @@
     loadSet();
     renderRank();
 
-    if (Store.myNick()) {
+    const c0 = Store.cfg();
+    const cfgReady = !!(c0.owner && c0.repo && c0.token);
+
+    if (Store.myNick() && cfgReady) {
       hideLogin();
-      if (Store.ready) doSync(true);
+      doSync(true);
+    } else if (Store.myNick() && !cfgReady) {
+      // 老版本登录过、还没套用内置配置：让 TA 重登一次，登录时就会自动配好
+      Store.clearSession();
+      showLogin();
+      setTimeout(() => toast('重新登录一次，同步配置会自动配好', 3600), 400);
     } else {
       showLogin();
     }
