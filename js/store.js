@@ -391,14 +391,12 @@
   /* ---------- 计算 ---------- */
   const MAX_SCORE = 10;
 
-  // 全部同向：分越高越好（「价格」= 越实惠分越高）
+  // 四个维度，满分 10 颗星（可拖到小数）
   const DIMS = [
     { key: 'taste', label: '味道' },
     { key: 'env', label: '环境' },
-    { key: 'service', label: '服务' },
-    { key: 'price', label: '价格', hint: '越实惠越高' },
-    { key: 'hygiene', label: '卫生' },
-    { key: 'speed', label: '等位', hint: '越快越高' }
+    { key: 'value', label: '性价比' },
+    { key: 'service', label: '服务' }
   ];
 
   /** 单条评分：只对填了的维度求平均 */

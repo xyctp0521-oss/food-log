@@ -53,7 +53,7 @@
     <div class="sortbar">
       <button class="sort-btn active" data-sort="score">综合分</button>
       <button class="sort-btn" data-sort="count">评价数</button>
-      <button class="sort-btn" data-sort="cost">人均</button>
+      <button class="sort-btn" data-sort="cost">花费</button>
       <button class="sort-btn" data-sort="new">最新</button>
     </div>
 
@@ -81,11 +81,12 @@
     <div class="card" id="step-newplace" hidden>
       <label class="lbl">新建店铺</label>
       <input type="text" id="np-name" placeholder="店名 *">
-      <div class="row2">
-        <input type="text" id="np-cat" placeholder="品类（如 湘菜）" list="cat-list">
-        <input type="number" id="np-cost" placeholder="人均（元）" inputmode="numeric">
-      </div>
+      <input type="text" id="np-cat" placeholder="品类（如 湘菜）" list="cat-list">
       <datalist id="cat-list"></datalist>
+      <div class="row2">
+        <input type="number" id="np-amount" placeholder="花费（元）" inputmode="decimal">
+        <input type="number" id="np-people" placeholder="人数" inputmode="numeric">
+      </div>
       <input type="text" id="np-addr" placeholder="地址（选填）">
       <div class="row2">
         <button class="btn-ghost" id="btn-np-cancel">取消</button>
@@ -98,7 +99,7 @@
       <div class="picked" id="picked-name"></div>
 
       <div class="dim-block" id="dim-block"></div>
-      <p class="hint" style="margin-top:8px">满分 10 分，同向打分：价格填「实惠程度」、等位填「出餐速度」，越高分越好。可不全填。</p>
+      <p class="hint" style="margin-top:8px">每项 10 颗星，拖动可打小数（如 8.3）。没把握的项可以不打。</p>
 
       <label class="lbl">本次吃了什么</label>
       <div id="dish-list"></div>
@@ -109,7 +110,7 @@
         <input type="number" id="r-bill" placeholder="总金额（元）" inputmode="decimal">
         <input type="number" id="r-people" placeholder="几人吃" inputmode="numeric">
       </div>
-      <p class="hint" id="bill-hint">填了金额和人数会自动算人均</p>
+      <p class="hint" id="bill-hint">填了会显示合计</p>
 
       <label class="lbl">照片</label>
       <div class="photo-grid" id="photo-grid"></div>

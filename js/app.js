@@ -20,6 +20,21 @@
   const n1 = v => (Math.round(Number(v || 0) * 10) / 10).toFixed(1);
   const bar = (v) => `<div class="bar-track"><div class="bar-fill" style="width:${Math.max(0, Math.min(100, (v / MAX_SCORE) * 100))}%"></div></div>`;
 
+  /** 花费展示：优先「花费 / 人数」，兼容旧数据的 avgCost */
+  function costText(p) {
+    if (!p) return '';
+    if (p.amount) return '¥' + p.amount + (p.people ? ` / ${p.people}人` : '');
+    if (p.avgCost) return '人均 ¥' + p.avgCost;
+    return '';
+  }
+  /** 排序用：花费额（旧数据用 人均×人数 估算） */
+  function costValue(p) {
+    if (!p) return 0;
+    if (p.amount) return Number(p.amount) || 0;
+    if (p.avgCost) return (Number(p.avgCost) || 0) * (Number(p.people) || 1);
+    return 0;
+  }
+
   const TAGS = ['值得二刷', '踩雷', '排队久', '性价比高', '环境好', '服务好', '适合聚餐', '一人食', '分量足', '要预约'];
   const NEG_TAGS = ['踩雷', '排队久'];
 
@@ -71,7 +86,7 @@
 
     if (UI.sort === 'score') withScore.sort((a, b) => (b.s.total - a.s.total) || (b.s.count - a.s.count));
     else if (UI.sort === 'count') withScore.sort((a, b) => (b.s.count - a.s.count) || (b.s.total - a.s.total));
-    else if (UI.sort === 'cost') withScore.sort((a, b) => (Number(b.p.avgCost) || 0) - (Number(a.p.avgCost) || 0));
+    else if (UI.sort === 'cost') withScore.sort((a, b) => costValue(b.p) - costValue(a.p));
     else withScore.sort((a, b) => String(b.p.createdAt || '').localeCompare(String(a.p.createdAt || '')));
 
     const box = $('#place-list');
@@ -80,11 +95,11 @@
       return `<div class="pcard" data-id="${esc(p.id)}">
         <div class="pcard-head">
           <div class="pcard-name">${esc(p.name)}</div>
-          ${s.count ? `<div class="pcard-score">${n1(s.total)}<small> 分</small></div>` : '<div class="pcard-score" style="font-size:13px;color:#7A7268">待评</div>'}
+          ${s.count ? `<div class="pcard-score">${n1(s.total)}<small> 星</small></div>` : '<div class="pcard-score" style="font-size:13px;color:#7A7268">待评</div>'}
         </div>
         <div class="pcard-meta">
           ${p.category ? `<span>${esc(p.category)}</span><span class="dot">·</span>` : ''}
-          ${p.avgCost ? `<span>人均 ¥${esc(p.avgCost)}</span><span class="dot">·</span>` : ''}
+          ${costText(p) ? `<span>${esc(costText(p))}</span><span class="dot">·</span>` : ''}
           <span>${s.count} 人评过</span>
         </div>
         ${s.count ? `<div class="bars">${DIMS.map(d => `<div class="bar"><div class="bar-t">${d.label}</div>${bar(s[d.key])}</div>`).join('')}</div>` : ''}
@@ -125,10 +140,6 @@
     const list = Store.ratingsOf(id);
     const s = summarize(list);
     const my = list.find(r => r.nick === Store.myNick());
-    // 有人填了账单+人数时，用真实人均顶掉手动填的参考值
-    const ppArr = list.map(r => (r.bill && r.people) ? r.bill / r.people : 0).filter(v => v > 0);
-    const realPP = ppArr.length ? ppArr.reduce((a, b) => a + b, 0) / ppArr.length : 0;
-    const perPerson = realPP || Number(p.avgCost) || 0;
 
     $('#sheet').innerHTML = `
       <div class="close-bar">
@@ -136,7 +147,7 @@
         <h2>${esc(p.name)}</h2>
         <div class="pcard-meta">
           ${p.category ? `<span>${esc(p.category)}</span><span class="dot">·</span>` : ''}
-          ${perPerson ? `<span>人均 ¥${perPerson.toFixed(0)}</span><span class="dot">·</span>` : ''}
+          ${costText(p) ? `<span>${esc(costText(p))}</span><span class="dot">·</span>` : ''}
           ${p.address ? `<span>${esc(p.address)}</span>` : ''}
         </div>
       </div>
@@ -146,7 +157,7 @@
       ${s.count ? `<div class="card">
         <div class="taste-line"><div class="l">综合</div><div class="t"><div class="f" style="width:${(s.total / MAX_SCORE) * 100}%"></div></div><div class="v">${n1(s.total)}</div></div>
         ${DIMS.map(d => `<div class="taste-line"><div class="l">${d.label}</div><div class="t"><div class="f" style="width:${(s[d.key] / MAX_SCORE) * 100}%"></div></div><div class="v">${n1(s[d.key])}</div></div>`).join('')}
-        <p class="hint">${s.count} 人评过${p.avgCost ? ` · 人均 ¥${esc(p.avgCost)}` : ''}</p>
+        <p class="hint">${s.count} 人评过${costText(p) ? ` · ${esc(costText(p))}` : ''}</p>
       </div>` : '<div class="card"><p class="hint">还没人评分，来当第一个。</p></div>'}
 
       <div class="list">
@@ -162,7 +173,7 @@
             ${r.comment ? `<div class="rate-cmt">${esc(r.comment)}</div>` : ''}
             ${(r.tags || []).length ? `<div class="tagline">${r.tags.map(t => `<span class="mini-tag${NEG_TAGS.includes(t) ? ' bad' : ''}">${esc(t)}</span>`).join('')}</div>` : ''}
             ${(r.dishes || []).length ? `<table class="dish-table">${r.dishes.map(x => `<tr><td>${esc(x.name)}</td><td>${x.price ? '¥' + x.price : ''}</td></tr>`).join('')}</table>` : ''}
-            ${r.bill ? `<div class="bill-row"><span>账单 ¥${r.bill}${r.people ? ` / ${r.people} 人` : ''}</span><b>${r.people ? `人均 ¥${(r.bill / r.people).toFixed(1)}` : `¥${r.bill}`}</b></div>` : ''}
+            ${r.bill ? `<div class="bill-row"><span>${r.people ? r.people + ' 人吃饭' : '本次账单'}</span><b>¥${r.bill}</b></div>` : ''}
             <div class="rate-date">${esc(r.visitedAt || '')}</div>
             ${r.nick === Store.myNick() ? `<div class="rate-edit" data-edit="${esc(r.id)}">修改我的评分</div>` : ''}
           </div>`;
@@ -233,7 +244,7 @@
       .filter(p => !key || p.name.toLowerCase().includes(key) || (p.category || '').toLowerCase().includes(key))
       .slice(0, 20);
     $('#pick-list').innerHTML = list.map(p => `<div class="pick-item" data-id="${esc(p.id)}">
-        <div><div class="n">${esc(p.name)}</div><div class="m">${esc(p.category || '未分类')}${p.avgCost ? ' · 人均 ¥' + esc(p.avgCost) : ''}</div></div>
+        <div><div class="n">${esc(p.name)}</div><div class="m">${esc(p.category || '未分类')}${costText(p) ? ' · ' + esc(costText(p)) : ''}</div></div>
         <div style="font-size:12px;color:#7A7268">${Store.ratingsOf(p.id).length} 评</div>
       </div>`).join('') || (key ? '<p class="hint">没找到，点下面新建</p>' : '');
     $$('#pick-list .pick-item').forEach(el => el.addEventListener('click', () => {
@@ -255,12 +266,12 @@
   $('#btn-np-next').addEventListener('click', () => {
     const name = $('#np-name').value.trim();
     if (!name) return toast('店名得填');
-    const cost = Number($('#np-cost').value) || null;
     startRate({
       id: 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
       name,
       category: $('#np-cat').value.trim(),
-      avgCost: cost,
+      amount: Number($('#np-amount').value) || 0,      // 花费
+      people: Number($('#np-people').value) || 0,      // 人数
       address: $('#np-addr').value.trim(),
       createdAt: new Date().toISOString()
     }, null, true);
@@ -315,35 +326,38 @@
     $('#step-newplace').hidden = true;
     $('#step-rate').hidden = false;
     $('#picked-name').innerHTML = esc(place.name) +
-      `<small>${esc(place.category || '未分类')}${place.avgCost ? ' · 人均 ¥' + esc(place.avgCost) : ''}${isNew ? ' · 新店' : ''}</small>`;
+      `<small>${esc(place.category || '未分类')}${costText(place) ? ' · ' + esc(costText(place)) : ''}${isNew ? ' · 新店' : ''}</small>`;
     renderDims();
     renderTagChips();
     renderDishes();
     renderPhotoGrid();
   }
 
-  /** 生成 6 个维度的 1-10 打分条（只建一次，之后只重绘状态） */
+  const STAR = '★';
+
+  /** 生成 4 个维度的 10 星滑动条（只建一次，之后只重绘状态） */
   function renderDims() {
     const box = $('#dim-block');
     if (!box.dataset.built) {
+      const stars = STAR.repeat(MAX_SCORE);
       box.innerHTML = DIMS.map(d => `
         <div class="dim-row">
-          <div class="dim-head">
-            <span class="dim-name">${esc(d.label)}</span>
-            <span class="dim-val" data-val="${d.key}">-</span>
+          <span class="dim-name">${esc(d.label)}</span>
+          <div class="stars-box">
+            <div class="stars-bg">${stars}</div>
+            <div class="stars-fill" data-fill="${d.key}">${stars}</div>
+            <input type="range" class="star-range" data-dim="${d.key}"
+                   min="0" max="${MAX_SCORE}" step="0.1" value="0" aria-label="${esc(d.label)}">
           </div>
-          <div class="num-scale" data-dim="${d.key}">
-            ${Array.from({ length: MAX_SCORE }, (_, i) => `<button class="num" data-v="${i + 1}">${i + 1}</button>`).join('')}
-          </div>
+          <span class="star-val" data-val="${d.key}">0.0</span>
         </div>`).join('');
 
-      $$('.num-scale', box).forEach(scale => {
-        const dim = scale.dataset.dim;
-        $$('.num', scale).forEach(btn => btn.addEventListener('click', () => {
-          const v = Number(btn.dataset.v);
-          UI.draft.scores[dim] = (UI.draft.scores[dim] === v) ? 0 : v;   // 再点一次取消
+      $$('.star-range', box).forEach(r => {
+        r.addEventListener('input', () => {
+          const v = Math.round(Number(r.value) * 10) / 10;   // 保留一位小数
+          UI.draft.scores[r.dataset.dim] = v;
           paintDims();
-        }));
+        });
       });
       box.dataset.built = '1';
     }
@@ -352,17 +366,13 @@
 
   function paintDims() {
     DIMS.forEach(d => {
-      const v = UI.draft.scores[d.key] || 0;
-      const scale = $('.num-scale[data-dim="' + d.key + '"]');
-      if (scale) {
-        $$('.num', scale).forEach(btn => {
-          const n = Number(btn.dataset.v);
-          const cur = n === v;
-          btn.className = 'num' + (n <= v ? ' on' : '') + (cur ? ' cur ' + (v <= 3 ? 'lv1' : v <= 6 ? 'lv2' : v <= 8 ? 'lv3' : 'lv4') : '');
-        });
-      }
-      const valEl = $('.dim-val[data-val="' + d.key + '"]');
-      if (valEl) valEl.textContent = v ? v : '-';
+      const v = Number(UI.draft.scores[d.key]) || 0;
+      const fill = $('.stars-fill[data-fill="' + d.key + '"]');
+      const val = $('.star-val[data-val="' + d.key + '"]');
+      const range = $('.star-range[data-dim="' + d.key + '"]');
+      if (fill) fill.style.width = (v / MAX_SCORE * 100).toFixed(2) + '%';
+      if (val) val.textContent = v.toFixed(1);
+      if (range && Math.abs(Number(range.value) - v) > 0.001) range.value = v;
     });
   }
 
@@ -411,7 +421,7 @@
     const people = Number($('#r-people').value) || 0;
     const dishSum = UI.draft.dishes.reduce((s, d) => s + (Number(d.price) || 0), 0);
     const parts = [];
-    if (bill && people) parts.push(`人均 ¥${(bill / people).toFixed(1)}`);
+    if (bill) parts.push(people ? `${people} 人 · 合计 ¥${bill}` : `合计 ¥${bill}`);
     if (dishSum) parts.push(`菜品合计 ¥${dishSum}`);
     if (bill && dishSum && Math.abs(bill - dishSum) >= 1) {
       parts.push(`与账单差 ¥${(bill - dishSum).toFixed(0)}`);
@@ -580,7 +590,7 @@
     $('#profile-card').innerHTML = `
       <div class="stat-row">
         <div class="stat"><b>${ratings.length}</b><span>评过</span></div>
-        <div class="stat"><b>${ratings.length ? n1(s.total) : '-'}</b><span>均分</span></div>
+        <div class="stat"><b>${ratings.length ? n1(s.total) : '-'}</b><span>平均星</span></div>
         <div class="stat"><b>${Store.places.length}</b><span>收录店</span></div>
       </div>
       ${ratings.length ? `<div style="margin-top:14px">
@@ -596,7 +606,7 @@
       return `<div class="pcard" data-id="${esc(r.placeId)}">
         <div class="pcard-head">
           <div class="pcard-name">${esc(r.placeName || (p && p.name) || '未知')}</div>
-          <div class="pcard-score">${n1(t)}<small> 分</small></div>
+          <div class="pcard-score">${n1(t)}<small> 星</small></div>
         </div>
         <div class="pcard-meta">${esc(r.visitedAt || '')}${r.comment ? '<span class="dot">·</span>' : ''}${r.comment ? `<span style="max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.comment)}</span>` : ''}</div>
         ${(r.tags || []).length ? `<div class="tagline">${r.tags.map(x => `<span class="mini-tag${NEG_TAGS.includes(x) ? ' bad' : ''}">${esc(x)}</span>`).join('')}</div>` : ''}

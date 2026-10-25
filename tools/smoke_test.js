@@ -44,7 +44,7 @@ check('无仓库配置 ready=false', Store.ready === false);
 
   await Store.saveMyRatings([{
     id: 'r1', placeId: Store.places[0].id, placeName: '笨萝卜浏阳菜馆',
-    taste: 10, env: 8, service: 6, price: 0, hygiene: 0, speed: 0,
+    taste: 10, env: 8, value: 6, service: 0,
     comment: '擂辣椒绝了', tags: ['值得二刷'],
     visitedAt: '2026-10-25', updatedAt: '2026-10-25T12:00:00Z'
   }]);
